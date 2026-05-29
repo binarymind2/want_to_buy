@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/database/app_database.dart';
+import 'features/products/presentation/providers/known_product_providers.dart';
+import 'features/purchases/domain/entities/shopping_item.dart';
+import 'features/purchases/presentation/providers/shopping_item_providers.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await AppDatabase.open();
 
-  runApp(const WantToBuyApp());
+  runApp(const ProviderScope(child: WantToBuyApp()));
 }
 
 /// Главный виджет приложения.
@@ -16,6 +20,10 @@ Future<void> main() async {
 /// - название приложения;
 /// - тему;
 /// - стартовый экран.
+///
+/// Важно:
+/// ProviderScope находится выше WantToBuyApp в main().
+/// Благодаря этому все виджеты внутри приложения могут использовать Riverpod.
 class WantToBuyApp extends StatelessWidget {
   const WantToBuyApp({super.key});
 
@@ -82,28 +90,33 @@ class _MainScreenState extends State<MainScreen> {
 
 /// Экран покупок.
 ///
-/// Сейчас это только каркас:
-/// - сверху будет список активных покупок;
-/// - снизу уже есть панель добавления товара.
-class PurchasesScreen extends StatefulWidget {
+/// Теперь это ConsumerStatefulWidget.
+///
+/// Почему не обычный StatefulWidget:
+/// экрану нужно читать providers через ref:
+/// - shoppingItemsProvider;
+/// - purchasesControllerProvider.
+class PurchasesScreen extends ConsumerStatefulWidget {
   const PurchasesScreen({super.key});
 
   @override
-  State<PurchasesScreen> createState() => _PurchasesScreenState();
+  ConsumerState<PurchasesScreen> createState() => _PurchasesScreenState();
 }
 
-class _PurchasesScreenState extends State<PurchasesScreen> {
+class _PurchasesScreenState extends ConsumerState<PurchasesScreen> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _quantityController = TextEditingController();
+  final FocusNode _nameFocusNode = FocusNode();
 
   @override
   void dispose() {
     _nameController.dispose();
     _quantityController.dispose();
+    _nameFocusNode.dispose();
     super.dispose();
   }
 
-  void _onAddPressed() {
+  Future<void> _onAddPressed() async {
     final name = _nameController.text.trim();
     final quantity = _quantityController.text.trim();
 
@@ -114,31 +127,62 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          quantity.isEmpty
-              ? 'Позже добавим товар: $name'
-              : 'Позже добавим товар: $name, количество: $quantity',
-        ),
-      ),
-    );
+    try {
+      await ref
+          .read(purchasesControllerProvider)
+          .addPurchase(name: name, quantity: quantity);
 
-    _nameController.clear();
-    _quantityController.clear();
+      if (!mounted) {
+        return;
+      }
+
+      _nameController.clear();
+      _quantityController.clear();
+      _nameFocusNode.requestFocus();
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Не удалось добавить товар: $error')),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final shoppingItemsAsync = ref.watch(shoppingItemsProvider);
+
     return Scaffold(
       appBar: AppBar(title: const Text('Покупки')),
       body: SafeArea(
         child: Column(
           children: [
-            const Expanded(child: EmptyPurchasesView()),
+            Expanded(
+              child: shoppingItemsAsync.when(
+                data: (items) {
+                  if (items.isEmpty) {
+                    return const EmptyPurchasesView();
+                  }
+
+                  return ShoppingItemsList(items: items);
+                },
+                loading: () {
+                  return const Center(child: CircularProgressIndicator());
+                },
+                error: (error, stackTrace) {
+                  return ErrorMessageView(
+                    title: 'Не удалось загрузить список покупок',
+                    message: error.toString(),
+                  );
+                },
+              ),
+            ),
             AddPurchasePanel(
               nameController: _nameController,
               quantityController: _quantityController,
+              nameFocusNode: _nameFocusNode,
               onAddPressed: _onAddPressed,
             ),
           ],
@@ -148,10 +192,72 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
   }
 }
 
+/// Список активных покупок.
+class ShoppingItemsList extends StatelessWidget {
+  const ShoppingItemsList({super.key, required this.items});
+
+  final List<ShoppingItem> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      itemCount: items.length,
+      separatorBuilder: (context, index) {
+        return const Divider(height: 1);
+      },
+      itemBuilder: (context, index) {
+        return ShoppingItemTile(item: items[index]);
+      },
+    );
+  }
+}
+
+/// Одна строка активной покупки.
+///
+/// Сейчас строка только отображает товар.
+/// В следующем шаге сюда добавим:
+/// - нажатие;
+/// - 5-секундный отсчёт;
+/// - прогресс-бар;
+/// - отмену удаления.
+class ShoppingItemTile extends StatelessWidget {
+  const ShoppingItemTile({super.key, required this.item});
+
+  final ShoppingItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              item.nameSnapshot,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodyLarge,
+            ),
+          ),
+          if (item.hasQuantity) ...[
+            const SizedBox(width: 12),
+            Text(
+              item.quantity!,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 /// Пустое состояние списка покупок.
 ///
-/// Пока настоящего списка ещё нет, показываем пользователю,
-/// что список пустой и товар можно добавить снизу.
+/// Показываем его, когда shoppingItemsProvider вернул пустой список.
 class EmptyPurchasesView extends StatelessWidget {
   const EmptyPurchasesView({super.key});
 
@@ -197,19 +303,18 @@ class EmptyPurchasesView extends StatelessWidget {
 /// - поле названия товара;
 /// - поле количества;
 /// - кнопка "+".
-///
-/// Сейчас панель только собирает ввод пользователя.
-/// Реальную запись в БД добавим позже.
 class AddPurchasePanel extends StatelessWidget {
   const AddPurchasePanel({
     super.key,
     required this.nameController,
     required this.quantityController,
+    required this.nameFocusNode,
     required this.onAddPressed,
   });
 
   final TextEditingController nameController;
   final TextEditingController quantityController;
+  final FocusNode nameFocusNode;
   final VoidCallback onAddPressed;
 
   @override
@@ -225,6 +330,7 @@ class AddPurchasePanel extends StatelessWidget {
               flex: 7,
               child: TextField(
                 controller: nameController,
+                focusNode: nameFocusNode,
                 textInputAction: TextInputAction.next,
                 decoration: const InputDecoration(
                   labelText: 'Товар',
@@ -267,9 +373,10 @@ class AddPurchasePanel extends StatelessWidget {
 
 /// Экран настроек.
 ///
-/// Пока здесь только будущие действия:
+/// Сейчас здесь:
 /// - проверка обновлений;
-/// - просмотр товаров в БД.
+/// - просмотр товаров в БД;
+/// - информация о приложении.
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
@@ -299,8 +406,55 @@ class SettingsScreen extends StatelessWidget {
       builder: (context) {
         return AlertDialog(
           title: const Text('Товары в БД'),
-          content: const Text(
-            'Позже здесь будет список товаров, которые приложение запомнило.',
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Consumer(
+              builder: (context, ref, child) {
+                final productsAsync = ref.watch(knownProductsProvider);
+
+                return productsAsync.when(
+                  data: (products) {
+                    if (products.isEmpty) {
+                      return const Text(
+                        'База товаров пока пустая.\n'
+                        'Добавьте товар на экране покупок.',
+                      );
+                    }
+
+                    return ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 360),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: products.length,
+                        separatorBuilder: (context, index) {
+                          return const Divider(height: 1);
+                        },
+                        itemBuilder: (context, index) {
+                          final product = products[index];
+
+                          return ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(product.name),
+                            subtitle: product.wasPurchased
+                                ? const Text('Товар уже покупали')
+                                : const Text('Пока не покупали'),
+                          );
+                        },
+                      ),
+                    );
+                  },
+                  loading: () {
+                    return const SizedBox(
+                      height: 96,
+                      child: Center(child: CircularProgressIndicator()),
+                    );
+                  },
+                  error: (error, stackTrace) {
+                    return Text('Не удалось загрузить товары: $error');
+                  },
+                );
+              },
+            ),
           ),
           actions: [
             TextButton(
@@ -332,7 +486,7 @@ class SettingsScreen extends StatelessWidget {
             ListTile(
               leading: const Icon(Icons.storage_outlined),
               title: const Text('Показать товары в БД'),
-              subtitle: const Text('Позже покажем сохранённые товары'),
+              subtitle: const Text('Показать сохранённые товары'),
               onTap: () => _showProductsDatabaseDialog(context),
             ),
             const Divider(height: 1),
@@ -366,6 +520,49 @@ class SettingsSectionTitle extends StatelessWidget {
         style: Theme.of(context).textTheme.titleSmall?.copyWith(
           color: colorScheme.primary,
           fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+}
+
+/// Виджет для отображения ошибки.
+class ErrorMessageView extends StatelessWidget {
+  const ErrorMessageView({
+    super.key,
+    required this.title,
+    required this.message,
+  });
+
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.error_outline, size: 56, color: colorScheme.error),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              style: Theme.of(context).textTheme.titleMedium,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: colorScheme.outline),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
       ),
     );
