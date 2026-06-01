@@ -74,6 +74,41 @@ void main() {
       expect(knownProductRepository.products, isEmpty);
       expect(shoppingItemRepository.items, isEmpty);
     });
+
+    test(
+      'completePurchase should mark product as purchased and remove item',
+      () async {
+        final knownProductRepository = FakeKnownProductRepository();
+        final shoppingItemRepository = FakeShoppingItemRepository();
+
+        final controller = PurchasesController(
+          knownProductRepository: knownProductRepository,
+          shoppingItemRepository: shoppingItemRepository,
+        );
+
+        final product = await knownProductRepository.getOrCreateByName(
+          'Молоко',
+        );
+
+        final item = await shoppingItemRepository.addOrUpdate(
+          product: product,
+          quantity: '2',
+        );
+
+        expect(shoppingItemRepository.items.length, 1);
+
+        await controller.completePurchase(item);
+
+        expect(shoppingItemRepository.items, isEmpty);
+
+        final updatedProduct = await knownProductRepository.findById(
+          product.id,
+        );
+
+        expect(updatedProduct, isNotNull);
+        expect(updatedProduct!.lastPurchasedAt, DateTime(2026, 1, 2));
+      },
+    );
   });
 }
 

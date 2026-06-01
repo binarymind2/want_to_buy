@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -104,15 +106,27 @@ class PurchasesScreen extends ConsumerStatefulWidget {
 }
 
 class _PurchasesScreenState extends ConsumerState<PurchasesScreen> {
+  static const Duration _removalDelay = Duration(seconds: 5);
+
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _quantityController = TextEditingController();
   final FocusNode _nameFocusNode = FocusNode();
 
+  final Map<String, Timer> _removalTimers = {};
+  final Set<String> _pendingRemovalItemIds = {};
+
   @override
   void dispose() {
+    for (final timer in _removalTimers.values) {
+      timer.cancel();
+    }
+
+    _removalTimers.clear();
+
     _nameController.dispose();
     _quantityController.dispose();
     _nameFocusNode.dispose();
+
     super.dispose();
   }
 
@@ -150,6 +164,66 @@ class _PurchasesScreenState extends ConsumerState<PurchasesScreen> {
     }
   }
 
+  void _onShoppingItemPressed(ShoppingItem item) {
+    if (_pendingRemovalItemIds.contains(item.id)) {
+      _cancelPendingRemoval(item.id);
+      return;
+    }
+
+    _startPendingRemoval(item);
+  }
+
+  void _startPendingRemoval(ShoppingItem item) {
+    final itemId = item.id;
+
+    _removalTimers[itemId]?.cancel();
+
+    setState(() {
+      _pendingRemovalItemIds.add(itemId);
+    });
+
+    _removalTimers[itemId] = Timer(_removalDelay, () {
+      unawaited(_completePendingRemoval(item));
+    });
+  }
+
+  void _cancelPendingRemoval(String itemId) {
+    final timer = _removalTimers.remove(itemId);
+    timer?.cancel();
+
+    if (!_pendingRemovalItemIds.contains(itemId)) {
+      return;
+    }
+
+    setState(() {
+      _pendingRemovalItemIds.remove(itemId);
+    });
+  }
+
+  Future<void> _completePendingRemoval(ShoppingItem item) async {
+    final itemId = item.id;
+
+    _removalTimers.remove(itemId);
+
+    if (mounted) {
+      setState(() {
+        _pendingRemovalItemIds.remove(itemId);
+      });
+    }
+
+    try {
+      await ref.read(purchasesControllerProvider).completePurchase(item);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Не удалось завершить покупку: $error')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final shoppingItemsAsync = ref.watch(shoppingItemsProvider);
@@ -166,7 +240,11 @@ class _PurchasesScreenState extends ConsumerState<PurchasesScreen> {
                     return const EmptyPurchasesView();
                   }
 
-                  return ShoppingItemsList(items: items);
+                  return ShoppingItemsList(
+                    items: items,
+                    pendingRemovalItemIds: _pendingRemovalItemIds,
+                    onItemPressed: _onShoppingItemPressed,
+                  );
                 },
                 loading: () {
                   return const Center(child: CircularProgressIndicator());
@@ -194,9 +272,16 @@ class _PurchasesScreenState extends ConsumerState<PurchasesScreen> {
 
 /// Список активных покупок.
 class ShoppingItemsList extends StatelessWidget {
-  const ShoppingItemsList({super.key, required this.items});
+  const ShoppingItemsList({
+    super.key,
+    required this.items,
+    required this.pendingRemovalItemIds,
+    required this.onItemPressed,
+  });
 
   final List<ShoppingItem> items;
+  final Set<String> pendingRemovalItemIds;
+  final ValueChanged<ShoppingItem> onItemPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -207,7 +292,14 @@ class ShoppingItemsList extends StatelessWidget {
         return const Divider(height: 1);
       },
       itemBuilder: (context, index) {
-        return ShoppingItemTile(item: items[index]);
+        final item = items[index];
+
+        return ShoppingItemTile(
+          key: ValueKey(item.id),
+          item: item,
+          isPendingRemoval: pendingRemovalItemIds.contains(item.id),
+          onPressed: () => onItemPressed(item),
+        );
       },
     );
   }
@@ -222,34 +314,77 @@ class ShoppingItemsList extends StatelessWidget {
 /// - прогресс-бар;
 /// - отмену удаления.
 class ShoppingItemTile extends StatelessWidget {
-  const ShoppingItemTile({super.key, required this.item});
+  const ShoppingItemTile({
+    super.key,
+    required this.item,
+    required this.isPendingRemoval,
+    required this.onPressed,
+  });
 
   final ShoppingItem item;
+  final bool isPendingRemoval;
+  final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              item.nameSnapshot,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.bodyLarge,
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return InkWell(
+      onTap: onPressed,
+      child: AnimatedOpacity(
+        opacity: isPendingRemoval ? 0.55 : 1,
+        duration: const Duration(milliseconds: 180),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      item.nameSnapshot,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodyLarge,
+                    ),
+                  ),
+                  if (item.hasQuantity) ...[
+                    const SizedBox(width: 12),
+                    Text(
+                      item.quantity!,
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
-          ),
-          if (item.hasQuantity) ...[
-            const SizedBox(width: 12),
-            Text(
-              item.quantity!,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
-            ),
+            if (isPendingRemoval)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: TweenAnimationBuilder<double>(
+                  key: ValueKey('removal-progress-${item.id}'),
+                  tween: Tween<double>(begin: 1, end: 0),
+                  duration: const Duration(seconds: 5),
+                  curve: Curves.linear,
+                  builder: (context, value, child) {
+                    return LinearProgressIndicator(
+                      value: value,
+                      minHeight: 3,
+                      backgroundColor: colorScheme.primary.withValues(
+                        alpha: 0.08,
+                      ),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        colorScheme.primary.withValues(alpha: 0.35),
+                      ),
+                    );
+                  },
+                ),
+              ),
           ],
-        ],
+        ),
       ),
     );
   }
