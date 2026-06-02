@@ -1,16 +1,34 @@
-# want_to_buy
+# Want to Buy
 
-A new Flutter project.
+Want to Buy — лёгкое Flutter-приложение для ведения списка покупок.
 
-## Getting Started
+Идея приложения простая: быстро добавить товар в список, указать количество при необходимости, купить товар и убрать его из списка одним нажатием.
 
-This project is a starting point for a Flutter application.
+Приложение не пытается быть большим планировщиком покупок. В нём нет цен, магазинов, единиц измерения, недельного планирования и шаблонов. Основная цель — быстрый и удобный список покупок.
 
-A few resources to get you started if this is your first Flutter project:
+## Возможности
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+На текущем этапе реализовано:
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+- экран покупок;
+- экран настроек;
+- добавление товара в список покупок;
+- необязательное количество товара;
+- автоподсказки по известным товарам;
+- запоминание новых товаров;
+- отображение последних покупок;
+- удаление товара через 5 секунд после нажатия;
+- отмена удаления повторным нажатием;
+- просмотр известных товаров в базе данных;
+- локальное хранение данных через Isar;
+- управление состоянием через Riverpod;
+- базовые unit- и widget-тесты.
+
+## Основной сценарий
+
+Пользователь открывает приложение и видит экран покупок.
+
+Внизу экрана находится панель добавления:
+
+```text
+[ Товар ] [ Кол-во ] [ + ]
