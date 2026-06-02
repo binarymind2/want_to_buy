@@ -105,4 +105,61 @@ void main() {
 
     expect(nameField.controller?.text, 'Молоко');
   });
+
+  testWidgets('Tap on shopping item should show removal progress', (
+    tester,
+  ) async {
+    final shoppingItems = [
+      ShoppingItem.create(
+        id: 'item-1',
+        knownProductId: 'product-1',
+        nameSnapshot: 'Молоко',
+        quantity: '2',
+        sortOrder: 1,
+        now: DateTime(2026, 1, 1),
+      ),
+    ];
+
+    await tester.pumpWidget(createTestApp(shoppingItems: shoppingItems));
+    await tester.pump();
+
+    expect(find.text('Молоко'), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+
+    await tester.tap(find.text('Молоко'));
+    await tester.pump();
+
+    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+  });
+
+  testWidgets('Second tap on shopping item should cancel removal progress', (
+    tester,
+  ) async {
+    final shoppingItems = [
+      ShoppingItem.create(
+        id: 'item-1',
+        knownProductId: 'product-1',
+        nameSnapshot: 'Молоко',
+        quantity: '2',
+        sortOrder: 1,
+        now: DateTime(2026, 1, 1),
+      ),
+    ];
+
+    await tester.pumpWidget(createTestApp(shoppingItems: shoppingItems));
+    await tester.pump();
+
+    await tester.tap(find.text('Молоко'));
+    await tester.pump();
+
+    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+
+    await tester.tap(find.text('Молоко'));
+    await tester.pump();
+
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+  });
 }

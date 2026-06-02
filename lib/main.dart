@@ -258,6 +258,7 @@ class _PurchasesScreenState extends ConsumerState<PurchasesScreen> {
                   return ShoppingItemsList(
                     items: items,
                     pendingRemovalItemIds: _pendingRemovalItemIds,
+                    removalDelay: _removalDelay,
                     onItemPressed: _onShoppingItemPressed,
                   );
                 },
@@ -293,11 +294,13 @@ class ShoppingItemsList extends StatelessWidget {
     super.key,
     required this.items,
     required this.pendingRemovalItemIds,
+    required this.removalDelay,
     required this.onItemPressed,
   });
 
   final List<ShoppingItem> items;
   final Set<String> pendingRemovalItemIds;
+  final Duration removalDelay;
   final ValueChanged<ShoppingItem> onItemPressed;
 
   @override
@@ -315,6 +318,7 @@ class ShoppingItemsList extends StatelessWidget {
           key: ValueKey(item.id),
           item: item,
           isPendingRemoval: pendingRemovalItemIds.contains(item.id),
+          removalDelay: removalDelay,
           onPressed: () => onItemPressed(item),
         );
       },
@@ -324,22 +328,25 @@ class ShoppingItemsList extends StatelessWidget {
 
 /// Одна строка активной покупки.
 ///
-/// Сейчас строка только отображает товар.
-/// В следующем шаге сюда добавим:
-/// - нажатие;
-/// - 5-секундный отсчёт;
-/// - прогресс-бар;
-/// - отмену удаления.
+/// Строка умеет не только отображать товар, но и показывать
+/// состояние ожидания удаления.
+///
+/// Когда пользователь нажал на товар:
+/// - строка становится полупрозрачной;
+/// - под строкой появляется progress bar;
+/// - повторное нажатие отменяет удаление.
 class ShoppingItemTile extends StatelessWidget {
   const ShoppingItemTile({
     super.key,
     required this.item,
     required this.isPendingRemoval,
+    required this.removalDelay,
     required this.onPressed,
   });
 
   final ShoppingItem item;
   final bool isPendingRemoval;
+  final Duration removalDelay;
   final VoidCallback onPressed;
 
   @override
@@ -384,7 +391,7 @@ class ShoppingItemTile extends StatelessWidget {
                 child: TweenAnimationBuilder<double>(
                   key: ValueKey('removal-progress-${item.id}'),
                   tween: Tween<double>(begin: 1, end: 0),
-                  duration: const Duration(seconds: 5),
+                  duration: removalDelay,
                   curve: Curves.linear,
                   builder: (context, value, child) {
                     return LinearProgressIndicator(
