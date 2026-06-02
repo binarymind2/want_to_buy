@@ -211,4 +211,54 @@ void main() {
 
     expect(nameField.controller?.text, 'Молоко');
   });
+
+  testWidgets('Settings screen should show settings actions', (tester) async {
+    await tester.pumpWidget(createTestApp());
+    await tester.pump();
+
+    await tester.tap(find.byIcon(Icons.settings_outlined));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Обновления'), findsOneWidget);
+    expect(find.text('Проверить обновления'), findsOneWidget);
+    expect(find.text('База товаров'), findsOneWidget);
+    expect(find.text('Показать товары в БД'), findsOneWidget);
+    expect(find.text('О приложении'), findsOneWidget);
+    expect(find.text('Want to Buy'), findsOneWidget);
+  });
+
+  testWidgets('Settings screen should show known products database dialog', (
+    tester,
+  ) async {
+    final knownProducts = [
+      KnownProduct.fromStorage(
+        id: 'product-1',
+        name: 'Молоко',
+        createdAt: DateTime(2026, 1, 1),
+        updatedAt: DateTime(2026, 1, 2),
+        lastPurchasedAt: DateTime(2026, 1, 2),
+      ),
+      KnownProduct.fromStorage(
+        id: 'product-2',
+        name: 'Хлеб',
+        createdAt: DateTime(2026, 1, 1),
+        updatedAt: DateTime(2026, 1, 1),
+      ),
+    ];
+
+    await tester.pumpWidget(createTestApp(knownProducts: knownProducts));
+    await tester.pump();
+
+    await tester.tap(find.byIcon(Icons.settings_outlined));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Показать товары в БД'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Товары в БД'), findsOneWidget);
+    expect(find.text('Молоко'), findsOneWidget);
+    expect(find.text('Хлеб'), findsOneWidget);
+    expect(find.text('Товар уже покупали'), findsOneWidget);
+    expect(find.text('Пока не покупали'), findsOneWidget);
+  });
 }
