@@ -101,4 +101,46 @@ void main() {
       },
     );
   });
+
+  test('should return all purchased products without limit', () async {
+    final products = List.generate(6, (index) {
+      final day = index + 1;
+
+      return KnownProduct.fromStorage(
+        id: 'product-$day',
+        name: 'Товар $day',
+        createdAt: DateTime(2026, 1, 1),
+        updatedAt: DateTime(2026, 1, day),
+        lastPurchasedAt: DateTime(2026, 1, day),
+      );
+    });
+
+    final container = ProviderContainer(
+      overrides: [
+        knownProductsProvider.overrideWith((ref) {
+          return Stream<List<KnownProduct>>.value(products);
+        }),
+        shoppingItemsProvider.overrideWith((ref) {
+          return Stream<List<ShoppingItem>>.value(const []);
+        }),
+      ],
+    );
+
+    addTearDown(container.dispose);
+
+    await container.read(knownProductsProvider.future);
+    await container.read(shoppingItemsProvider.future);
+
+    final recentProducts = container.read(recentKnownProductsProvider);
+
+    expect(recentProducts.length, 6);
+    expect(recentProducts.map((product) => product.name), [
+      'Товар 6',
+      'Товар 5',
+      'Товар 4',
+      'Товар 3',
+      'Товар 2',
+      'Товар 1',
+    ]);
+  });
 }

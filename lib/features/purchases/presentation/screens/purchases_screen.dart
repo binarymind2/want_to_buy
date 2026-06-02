@@ -18,6 +18,7 @@ import '../widgets/shopping_items_list.dart';
 /// Это главный экран приложения.
 /// Он отвечает за пользовательский сценарий:
 /// - показать активные покупки;
+/// - ниже показать последние покупки;
 /// - добавить новую покупку;
 /// - запустить удаление покупки через 5 секунд;
 /// - отменить удаление повторным нажатием.
@@ -109,6 +110,21 @@ class _PurchasesScreenState extends ConsumerState<PurchasesScreen> {
     _startPendingRemoval(item);
   }
 
+  /// Подставляет товар из последних покупок в поле ввода.
+  ///
+  /// Мы не добавляем его сразу в активные покупки.
+  ///
+  /// Почему:
+  /// пользователь может захотеть указать количество.
+  void _onRecentProductPressed(KnownProduct product) {
+    _nameController.value = TextEditingValue(
+      text: product.name,
+      selection: TextSelection.collapsed(offset: product.name.length),
+    );
+
+    _nameFocusNode.requestFocus();
+  }
+
   void _startPendingRemoval(ShoppingItem item) {
     final itemId = item.id;
 
@@ -186,15 +202,20 @@ class _PurchasesScreenState extends ConsumerState<PurchasesScreen> {
             Expanded(
               child: shoppingItemsAsync.when(
                 data: (items) {
-                  if (items.isEmpty) {
+                  final hasActiveItems = items.isNotEmpty;
+                  final hasRecentProducts = recentProducts.isNotEmpty;
+
+                  if (!hasActiveItems && !hasRecentProducts) {
                     return const EmptyPurchasesView();
                   }
 
                   return ShoppingItemsList(
                     items: items,
+                    recentProducts: recentProducts,
                     pendingRemovalItemIds: _pendingRemovalItemIds,
                     removalDelay: _removalDelay,
                     onItemPressed: _onShoppingItemPressed,
+                    onRecentProductPressed: _onRecentProductPressed,
                   );
                 },
                 loading: () {
@@ -213,7 +234,6 @@ class _PurchasesScreenState extends ConsumerState<PurchasesScreen> {
               quantityController: _quantityController,
               nameFocusNode: _nameFocusNode,
               knownProducts: knownProducts,
-              recentProducts: recentProducts,
               activeKnownProductIds: activeKnownProductIds,
               onAddPressed: _onAddPressed,
             ),

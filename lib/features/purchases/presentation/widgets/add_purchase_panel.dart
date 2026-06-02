@@ -10,11 +10,11 @@ import 'product_suggestions_list.dart';
 /// - поле названия товара;
 /// - поле количества;
 /// - кнопка "+";
-/// - последние покупки;
-/// - подсказки известных товаров.
+/// - подсказки известных товаров во время ввода.
 ///
-/// Этот виджет ничего не знает про Isar и Riverpod.
-/// Он получает готовые данные и callback-и от PurchasesScreen.
+/// Важно:
+/// последние покупки больше не показываются здесь.
+/// Они теперь являются частью общего списка на экране покупок.
 class AddPurchasePanel extends StatelessWidget {
   const AddPurchasePanel({
     super.key,
@@ -22,7 +22,6 @@ class AddPurchasePanel extends StatelessWidget {
     required this.quantityController,
     required this.nameFocusNode,
     required this.knownProducts,
-    required this.recentProducts,
     required this.activeKnownProductIds,
     required this.onAddPressed,
   });
@@ -35,16 +34,6 @@ class AddPurchasePanel extends StatelessWidget {
   ///
   /// Именно из них мы строим подсказки во время ввода.
   final List<KnownProduct> knownProducts;
-
-  /// Последние купленные товары.
-  ///
-  /// Они показываются тогда, когда поле названия пустое.
-  ///
-  /// Почему так:
-  /// если пользователь ещё ничего не вводит,
-  /// скорее всего ему удобно быстро вернуть в список
-  /// что-то из недавно купленного.
-  final List<KnownProduct> recentProducts;
 
   /// id товаров, которые уже есть в активном списке покупок.
   ///
@@ -136,16 +125,7 @@ class AddPurchasePanel extends StatelessWidget {
                 final normalizedQuery = normalizeProductName(query);
 
                 if (normalizedQuery.isEmpty) {
-                  if (recentProducts.isEmpty) {
-                    return const SizedBox.shrink();
-                  }
-
-                  return ProductSuggestionsList(
-                    title: 'Последние покупки',
-                    icon: Icons.history,
-                    suggestions: recentProducts,
-                    onSuggestionSelected: _selectProduct,
-                  );
+                  return const SizedBox.shrink();
                 }
 
                 final suggestions = _findSuggestions(query);

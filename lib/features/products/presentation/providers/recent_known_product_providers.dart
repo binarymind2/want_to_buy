@@ -14,11 +14,15 @@ import 'known_product_providers.dart';
 /// - оставляем только те, которые уже покупали;
 /// - исключаем товары, которые уже есть в активном списке;
 /// - сортируем от самой новой покупки к самой старой;
-/// - берём первые 5 товаров.
+/// - возвращаем весь список.
+///
+/// Почему больше не используем limit:
+/// пользователь хочет видеть все последние покупки,
+/// которые есть в базе, а не только первые 5.
 ///
 /// Почему исключаем активные товары:
-/// если "Молоко" уже есть в списке покупок,
-/// не нужно предлагать его ещё раз в блоке "Последние покупки".
+/// если "Молоко" уже есть в списке покупок сверху,
+/// не нужно показывать его ещё раз ниже в последних покупках.
 final recentKnownProductsProvider = Provider<List<KnownProduct>>((ref) {
   final knownProductsAsync = ref.watch(knownProductsProvider);
   final shoppingItemsAsync = ref.watch(shoppingItemsProvider);
@@ -45,7 +49,7 @@ final recentKnownProductsProvider = Provider<List<KnownProduct>>((ref) {
         return second.lastPurchasedAt!.compareTo(first.lastPurchasedAt!);
       });
 
-      return recentProducts.take(5).toList();
+      return recentProducts;
     },
     orElse: () => const <KnownProduct>[],
   );

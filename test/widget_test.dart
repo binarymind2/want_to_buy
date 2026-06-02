@@ -168,11 +168,22 @@ void main() {
   });
 
   testWidgets(
-    'Add panel should show recent products when name field is empty',
+    'Purchases screen should show recent products after active purchases',
     (tester) async {
+      final shoppingItems = [
+        ShoppingItem.create(
+          id: 'item-1',
+          knownProductId: 'product-1',
+          nameSnapshot: 'Хлеб',
+          quantity: '1',
+          sortOrder: 1,
+          now: DateTime(2026, 1, 1),
+        ),
+      ];
+
       final recentProducts = [
         KnownProduct.fromStorage(
-          id: 'product-1',
+          id: 'product-2',
           name: 'Молоко',
           createdAt: DateTime(2026, 1, 1),
           updatedAt: DateTime(2026, 1, 2),
@@ -180,11 +191,26 @@ void main() {
         ),
       ];
 
-      await tester.pumpWidget(createTestApp(recentProducts: recentProducts));
+      await tester.pumpWidget(
+        createTestApp(
+          shoppingItems: shoppingItems,
+          recentProducts: recentProducts,
+        ),
+      );
       await tester.pump();
 
+      expect(find.text('Хлеб'), findsOneWidget);
       expect(find.text('Последние покупки'), findsOneWidget);
       expect(find.text('Молоко'), findsOneWidget);
+
+      final activeItemTop = tester.getTopLeft(find.text('Хлеб')).dy;
+      final recentTitleTop = tester
+          .getTopLeft(find.text('Последние покупки'))
+          .dy;
+      final recentItemTop = tester.getTopLeft(find.text('Молоко')).dy;
+
+      expect(activeItemTop < recentTitleTop, isTrue);
+      expect(recentTitleTop < recentItemTop, isTrue);
     },
   );
 
@@ -259,4 +285,36 @@ void main() {
     expect(find.text('Товар уже покупали'), findsOneWidget);
     expect(find.text('Пока не покупали'), findsOneWidget);
   });
+
+  testWidgets(
+    'Purchases screen should show all recent products without icons',
+    (tester) async {
+      final recentProducts = List.generate(6, (index) {
+        final day = index + 1;
+
+        return KnownProduct.fromStorage(
+          id: 'product-$day',
+          name: 'Товар $day',
+          createdAt: DateTime(2026, 1, 1),
+          updatedAt: DateTime(2026, 1, day),
+          lastPurchasedAt: DateTime(2026, 1, day),
+        );
+      });
+
+      await tester.pumpWidget(createTestApp(recentProducts: recentProducts));
+      await tester.pump();
+
+      expect(find.text('Последние покупки'), findsOneWidget);
+
+      expect(find.text('Товар 1'), findsOneWidget);
+      expect(find.text('Товар 2'), findsOneWidget);
+      expect(find.text('Товар 3'), findsOneWidget);
+      expect(find.text('Товар 4'), findsOneWidget);
+      expect(find.text('Товар 5'), findsOneWidget);
+      expect(find.text('Товар 6'), findsOneWidget);
+
+      expect(find.byIcon(Icons.history), findsNothing);
+      expect(find.byIcon(Icons.add_circle_outline), findsNothing);
+    },
+  );
 }
