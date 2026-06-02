@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/database/app_database.dart';
+import 'features/products/domain/entities/known_product.dart';
+import 'features/products/domain/utils/product_name_normalizer.dart';
 import 'features/products/presentation/providers/known_product_providers.dart';
 import 'features/purchases/domain/entities/shopping_item.dart';
 import 'features/purchases/presentation/providers/shopping_item_providers.dart';
@@ -227,6 +229,19 @@ class _PurchasesScreenState extends ConsumerState<PurchasesScreen> {
   @override
   Widget build(BuildContext context) {
     final shoppingItemsAsync = ref.watch(shoppingItemsProvider);
+    final knownProductsAsync = ref.watch(knownProductsProvider);
+
+    final knownProducts = knownProductsAsync.maybeWhen(
+      data: (products) => products,
+      orElse: () => const <KnownProduct>[],
+    );
+
+    final activeKnownProductIds = shoppingItemsAsync.maybeWhen(
+      data: (items) {
+        return items.map((item) => item.knownProductId).toSet();
+      },
+      orElse: () => const <String>{},
+    );
 
     return Scaffold(
       appBar: AppBar(title: const Text('Покупки')),
@@ -261,6 +276,8 @@ class _PurchasesScreenState extends ConsumerState<PurchasesScreen> {
               nameController: _nameController,
               quantityController: _quantityController,
               nameFocusNode: _nameFocusNode,
+              knownProducts: knownProducts,
+              activeKnownProductIds: activeKnownProductIds,
               onAddPressed: _onAddPressed,
             ),
           ],
@@ -437,20 +454,94 @@ class EmptyPurchasesView extends StatelessWidget {
 /// Здесь есть:
 /// - поле названия товара;
 /// - поле количества;
-/// - кнопка "+".
+/// - кнопка "+";
+/// - подсказки известных товаров.
 class AddPurchasePanel extends StatelessWidget {
   const AddPurchasePanel({
     super.key,
     required this.nameController,
     required this.quantityController,
     required this.nameFocusNode,
+    required this.knownProducts,
+    required this.activeKnownProductIds,
     required this.onAddPressed,
   });
 
   final TextEditingController nameController;
   final TextEditingController quantityController;
   final FocusNode nameFocusNode;
+
+  /// Все известные товары из БД.
+  ///
+  /// Именно из них мы строим подсказки.
+  final List<KnownProduct> knownProducts;
+
+  /// id товаров, которые уже есть в активном списке покупок.
+  ///
+  /// Зачем нужно:
+  /// если товар уже добавлен в покупки, не нужно снова предлагать его
+  /// в подсказках.
+  final Set<String> activeKnownProductIds;
+
   final VoidCallback onAddPressed;
+
+  /// Ищет подсказки для текущего текста в поле названия.
+  ///
+  /// Пример:
+  /// query: "мо"
+  ///
+  /// knownProducts:
+  /// - Молоко
+  /// - Морковь
+  /// - Хлеб
+  ///
+  /// результат:
+  /// - Молоко
+  /// - Морковь
+  List<KnownProduct> _findSuggestions(String query) {
+    final normalizedQuery = normalizeProductName(query);
+
+    if (normalizedQuery.isEmpty) {
+      return const <KnownProduct>[];
+    }
+
+    final suggestions = knownProducts.where((product) {
+      final isAlreadyInActiveList = activeKnownProductIds.contains(product.id);
+
+      if (isAlreadyInActiveList) {
+        return false;
+      }
+
+      return product.normalizedName.contains(normalizedQuery);
+    }).toList();
+
+    suggestions.sort((first, second) {
+      final firstStartsWithQuery = first.normalizedName.startsWith(
+        normalizedQuery,
+      );
+      final secondStartsWithQuery = second.normalizedName.startsWith(
+        normalizedQuery,
+      );
+
+      if (firstStartsWithQuery != secondStartsWithQuery) {
+        return firstStartsWithQuery ? -1 : 1;
+      }
+
+      return first.normalizedName.compareTo(second.normalizedName);
+    });
+
+    return suggestions.take(5).toList();
+  }
+
+  /// Подставляет выбранную подсказку в поле названия.
+  void _selectSuggestion(KnownProduct product) {
+    nameController.value = TextEditingValue(
+      text: product.name,
+      selection: TextSelection.collapsed(offset: product.name.length),
+    );
+
+    nameFocusNode.requestFocus();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -459,47 +550,120 @@ class AddPurchasePanel extends StatelessWidget {
       color: Theme.of(context).colorScheme.surface,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Expanded(
-              flex: 7,
-              child: TextField(
-                controller: nameController,
-                focusNode: nameFocusNode,
-                textInputAction: TextInputAction.next,
-                decoration: const InputDecoration(
-                  labelText: 'Товар',
-                  hintText: 'Например: молоко',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-              ),
+            ValueListenableBuilder<TextEditingValue>(
+              valueListenable: nameController,
+              builder: (context, value, child) {
+                final suggestions = _findSuggestions(value.text);
+
+                if (suggestions.isEmpty) {
+                  return const SizedBox.shrink();
+                }
+
+                return ProductSuggestionsList(
+                  suggestions: suggestions,
+                  onSuggestionSelected: _selectSuggestion,
+                );
+              },
             ),
-            const SizedBox(width: 8),
-            Expanded(
-              flex: 2,
-              child: TextField(
-                controller: quantityController,
-                keyboardType: TextInputType.number,
-                textInputAction: TextInputAction.done,
-                decoration: const InputDecoration(
-                  labelText: 'Кол-во',
-                  border: OutlineInputBorder(),
-                  isDense: true,
+            Row(
+              children: [
+                Expanded(
+                  flex: 7,
+                  child: TextField(
+                    controller: nameController,
+                    focusNode: nameFocusNode,
+                    textInputAction: TextInputAction.next,
+                    decoration: const InputDecoration(
+                      labelText: 'Товар',
+                      hintText: 'Например: молоко',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
                 ),
-                onSubmitted: (_) => onAddPressed(),
-              ),
-            ),
-            const SizedBox(width: 8),
-            SizedBox(
-              height: 48,
-              width: 48,
-              child: FilledButton(
-                onPressed: onAddPressed,
-                child: const Icon(Icons.add),
-              ),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 2,
+                  child: TextField(
+                    controller: quantityController,
+                    keyboardType: TextInputType.number,
+                    textInputAction: TextInputAction.done,
+                    decoration: const InputDecoration(
+                      labelText: 'Кол-во',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    onSubmitted: (_) => onAddPressed(),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                SizedBox(
+                  height: 48,
+                  width: 48,
+                  child: FilledButton(
+                    onPressed: onAddPressed,
+                    child: const Icon(Icons.add),
+                  ),
+                ),
+              ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Список подсказок для поля названия товара.
+///
+/// Это не отдельный экран и не данные из интернета.
+/// Это маленькая панель над нижней строкой ввода.
+///
+/// Почему подсказки здесь:
+/// пользователь вводит товар внизу экрана,
+/// поэтому варианты должны появляться рядом с местом ввода.
+class ProductSuggestionsList extends StatelessWidget {
+  const ProductSuggestionsList({
+    super.key,
+    required this.suggestions,
+    required this.onSuggestionSelected,
+  });
+
+  final List<KnownProduct> suggestions;
+  final ValueChanged<KnownProduct> onSuggestionSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12),
+        clipBehavior: Clip.antiAlias,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 220),
+          child: ListView.separated(
+            shrinkWrap: true,
+            itemCount: suggestions.length,
+            separatorBuilder: (context, index) {
+              return const Divider(height: 1);
+            },
+            itemBuilder: (context, index) {
+              final product = suggestions[index];
+
+              return ListTile(
+                dense: true,
+                leading: const Icon(Icons.history),
+                title: Text(product.name),
+                onTap: () => onSuggestionSelected(product),
+              );
+            },
+          ),
         ),
       ),
     );

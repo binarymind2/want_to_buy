@@ -8,14 +8,17 @@ import 'package:want_to_buy/features/purchases/presentation/providers/shopping_i
 import 'package:want_to_buy/main.dart';
 
 void main() {
-  Widget createTestApp() {
+  Widget createTestApp({
+    List<ShoppingItem> shoppingItems = const <ShoppingItem>[],
+    List<KnownProduct> knownProducts = const <KnownProduct>[],
+  }) {
     return ProviderScope(
       overrides: [
         shoppingItemsProvider.overrideWith((ref) {
-          return Stream<List<ShoppingItem>>.value(const <ShoppingItem>[]);
+          return Stream<List<ShoppingItem>>.value(shoppingItems);
         }),
         knownProductsProvider.overrideWith((ref) {
-          return Stream<List<KnownProduct>>.value(const <KnownProduct>[]);
+          return Stream<List<KnownProduct>>.value(knownProducts);
         }),
       ],
       child: const WantToBuyApp(),
@@ -50,5 +53,56 @@ void main() {
     expect(find.text('Добавьте товар внизу экрана'), findsOneWidget);
     expect(find.text('Товар'), findsOneWidget);
     expect(find.text('Кол-во'), findsOneWidget);
+  });
+
+  testWidgets('Add panel should show product suggestions while typing', (
+    tester,
+  ) async {
+    final knownProducts = [
+      KnownProduct.create(
+        id: 'product-1',
+        name: 'Молоко',
+        now: DateTime(2026, 1, 1),
+      ),
+      KnownProduct.create(
+        id: 'product-2',
+        name: 'Хлеб',
+        now: DateTime(2026, 1, 1),
+      ),
+    ];
+
+    await tester.pumpWidget(createTestApp(knownProducts: knownProducts));
+    await tester.pump();
+
+    await tester.enterText(find.byType(TextField).first, 'мо');
+    await tester.pump();
+
+    expect(find.text('Молоко'), findsOneWidget);
+    expect(find.text('Хлеб'), findsNothing);
+  });
+
+  testWidgets('Tap on suggestion should fill product name field', (
+    tester,
+  ) async {
+    final knownProducts = [
+      KnownProduct.create(
+        id: 'product-1',
+        name: 'Молоко',
+        now: DateTime(2026, 1, 1),
+      ),
+    ];
+
+    await tester.pumpWidget(createTestApp(knownProducts: knownProducts));
+    await tester.pump();
+
+    await tester.enterText(find.byType(TextField).first, 'мо');
+    await tester.pump();
+
+    await tester.tap(find.text('Молоко'));
+    await tester.pump();
+
+    final nameField = tester.widget<TextField>(find.byType(TextField).first);
+
+    expect(nameField.controller?.text, 'Молоко');
   });
 }
