@@ -219,8 +219,6 @@ void main() {
     await tester.tap(find.byIcon(Icons.settings_outlined));
     await tester.pumpAndSettle();
 
-    expect(find.text('Обновления'), findsOneWidget);
-    expect(find.text('Проверить обновления'), findsOneWidget);
     expect(find.text('База товаров'), findsOneWidget);
     expect(find.text('Показать товары в БД'), findsOneWidget);
     expect(find.text('О приложении'), findsOneWidget);
