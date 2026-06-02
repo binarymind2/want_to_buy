@@ -7,6 +7,7 @@ import 'core/database/app_database.dart';
 import 'features/products/domain/entities/known_product.dart';
 import 'features/products/domain/utils/product_name_normalizer.dart';
 import 'features/products/presentation/providers/known_product_providers.dart';
+import 'features/products/presentation/providers/recent_known_product_providers.dart';
 import 'features/purchases/domain/entities/shopping_item.dart';
 import 'features/purchases/presentation/providers/shopping_item_providers.dart';
 
@@ -230,6 +231,7 @@ class _PurchasesScreenState extends ConsumerState<PurchasesScreen> {
   Widget build(BuildContext context) {
     final shoppingItemsAsync = ref.watch(shoppingItemsProvider);
     final knownProductsAsync = ref.watch(knownProductsProvider);
+    final recentProducts = ref.watch(recentKnownProductsProvider);
 
     final knownProducts = knownProductsAsync.maybeWhen(
       data: (products) => products,
@@ -278,6 +280,7 @@ class _PurchasesScreenState extends ConsumerState<PurchasesScreen> {
               quantityController: _quantityController,
               nameFocusNode: _nameFocusNode,
               knownProducts: knownProducts,
+              recentProducts: recentProducts,
               activeKnownProductIds: activeKnownProductIds,
               onAddPressed: _onAddPressed,
             ),
@@ -462,6 +465,7 @@ class EmptyPurchasesView extends StatelessWidget {
 /// - поле названия товара;
 /// - поле количества;
 /// - кнопка "+";
+/// - последние покупки;
 /// - подсказки известных товаров.
 class AddPurchasePanel extends StatelessWidget {
   const AddPurchasePanel({
@@ -470,6 +474,7 @@ class AddPurchasePanel extends StatelessWidget {
     required this.quantityController,
     required this.nameFocusNode,
     required this.knownProducts,
+    required this.recentProducts,
     required this.activeKnownProductIds,
     required this.onAddPressed,
   });
@@ -480,8 +485,18 @@ class AddPurchasePanel extends StatelessWidget {
 
   /// Все известные товары из БД.
   ///
-  /// Именно из них мы строим подсказки.
+  /// Именно из них мы строим подсказки во время ввода.
   final List<KnownProduct> knownProducts;
+
+  /// Последние купленные товары.
+  ///
+  /// Они показываются тогда, когда поле названия пустое.
+  ///
+  /// Почему так:
+  /// если пользователь ещё ничего не вводит,
+  /// скорее всего ему удобно быстро вернуть в список
+  /// что-то из недавно купленного.
+  final List<KnownProduct> recentProducts;
 
   /// id товаров, которые уже есть в активном списке покупок.
   ///
@@ -540,8 +555,14 @@ class AddPurchasePanel extends StatelessWidget {
     return suggestions.take(5).toList();
   }
 
-  /// Подставляет выбранную подсказку в поле названия.
-  void _selectSuggestion(KnownProduct product) {
+  /// Подставляет выбранный товар в поле названия.
+  ///
+  /// Мы не добавляем товар сразу после нажатия на подсказку.
+  /// Мы только заполняем поле.
+  ///
+  /// Почему:
+  /// пользователь может захотеть указать количество перед нажатием "+".
+  void _selectProduct(KnownProduct product) {
     nameController.value = TextEditingValue(
       text: product.name,
       selection: TextSelection.collapsed(offset: product.name.length),
@@ -563,15 +584,33 @@ class AddPurchasePanel extends StatelessWidget {
             ValueListenableBuilder<TextEditingValue>(
               valueListenable: nameController,
               builder: (context, value, child) {
-                final suggestions = _findSuggestions(value.text);
+                final query = value.text;
+                final normalizedQuery = normalizeProductName(query);
+
+                if (normalizedQuery.isEmpty) {
+                  if (recentProducts.isEmpty) {
+                    return const SizedBox.shrink();
+                  }
+
+                  return ProductSuggestionsList(
+                    title: 'Последние покупки',
+                    icon: Icons.history,
+                    suggestions: recentProducts,
+                    onSuggestionSelected: _selectProduct,
+                  );
+                }
+
+                final suggestions = _findSuggestions(query);
 
                 if (suggestions.isEmpty) {
                   return const SizedBox.shrink();
                 }
 
                 return ProductSuggestionsList(
+                  title: 'Подсказки',
+                  icon: Icons.search,
                   suggestions: suggestions,
-                  onSuggestionSelected: _selectSuggestion,
+                  onSuggestionSelected: _selectProduct,
                 );
               },
             ),
@@ -624,21 +663,26 @@ class AddPurchasePanel extends StatelessWidget {
   }
 }
 
-/// Список подсказок для поля названия товара.
+/// Список товаров над полем ввода.
 ///
-/// Это не отдельный экран и не данные из интернета.
-/// Это маленькая панель над нижней строкой ввода.
+/// Этот виджет используется в двух сценариях:
+/// 1. "Последние покупки" — когда поле ввода пустое.
+/// 2. "Подсказки" — когда пользователь начал вводить текст.
 ///
-/// Почему подсказки здесь:
-/// пользователь вводит товар внизу экрана,
-/// поэтому варианты должны появляться рядом с местом ввода.
+/// Почему используем один виджет:
+/// визуально это один и тот же список товаров,
+/// отличается только заголовок и иконка.
 class ProductSuggestionsList extends StatelessWidget {
   const ProductSuggestionsList({
     super.key,
+    required this.title,
+    required this.icon,
     required this.suggestions,
     required this.onSuggestionSelected,
   });
 
+  final String title;
+  final IconData icon;
   final List<KnownProduct> suggestions;
   final ValueChanged<KnownProduct> onSuggestionSelected;
 
@@ -653,23 +697,47 @@ class ProductSuggestionsList extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         clipBehavior: Clip.antiAlias,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: 220),
-          child: ListView.separated(
-            shrinkWrap: true,
-            itemCount: suggestions.length,
-            separatorBuilder: (context, index) {
-              return const Divider(height: 1);
-            },
-            itemBuilder: (context, index) {
-              final product = suggestions[index];
+          constraints: const BoxConstraints(maxHeight: 260),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+                child: Row(
+                  children: [
+                    Icon(icon, size: 18, color: colorScheme.primary),
+                    const SizedBox(width: 8),
+                    Text(
+                      title,
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: colorScheme.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: suggestions.length,
+                  separatorBuilder: (context, index) {
+                    return const Divider(height: 1);
+                  },
+                  itemBuilder: (context, index) {
+                    final product = suggestions[index];
 
-              return ListTile(
-                dense: true,
-                leading: const Icon(Icons.history),
-                title: Text(product.name),
-                onTap: () => onSuggestionSelected(product),
-              );
-            },
+                    return ListTile(
+                      dense: true,
+                      leading: Icon(icon),
+                      title: Text(product.name),
+                      onTap: () => onSuggestionSelected(product),
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
         ),
       ),

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:want_to_buy/features/products/domain/entities/known_product.dart';
 import 'package:want_to_buy/features/products/presentation/providers/known_product_providers.dart';
+import 'package:want_to_buy/features/products/presentation/providers/recent_known_product_providers.dart';
 import 'package:want_to_buy/features/purchases/domain/entities/shopping_item.dart';
 import 'package:want_to_buy/features/purchases/presentation/providers/shopping_item_providers.dart';
 import 'package:want_to_buy/main.dart';
@@ -11,6 +12,7 @@ void main() {
   Widget createTestApp({
     List<ShoppingItem> shoppingItems = const <ShoppingItem>[],
     List<KnownProduct> knownProducts = const <KnownProduct>[],
+    List<KnownProduct>? recentProducts,
   }) {
     return ProviderScope(
       overrides: [
@@ -20,6 +22,8 @@ void main() {
         knownProductsProvider.overrideWith((ref) {
           return Stream<List<KnownProduct>>.value(knownProducts);
         }),
+        if (recentProducts != null)
+          recentKnownProductsProvider.overrideWithValue(recentProducts),
       ],
       child: const WantToBuyApp(),
     );
@@ -161,5 +165,50 @@ void main() {
     await tester.pump();
 
     expect(find.byType(LinearProgressIndicator), findsNothing);
+  });
+
+  testWidgets(
+    'Add panel should show recent products when name field is empty',
+    (tester) async {
+      final recentProducts = [
+        KnownProduct.fromStorage(
+          id: 'product-1',
+          name: 'Молоко',
+          createdAt: DateTime(2026, 1, 1),
+          updatedAt: DateTime(2026, 1, 2),
+          lastPurchasedAt: DateTime(2026, 1, 2),
+        ),
+      ];
+
+      await tester.pumpWidget(createTestApp(recentProducts: recentProducts));
+      await tester.pump();
+
+      expect(find.text('Последние покупки'), findsOneWidget);
+      expect(find.text('Молоко'), findsOneWidget);
+    },
+  );
+
+  testWidgets('Tap on recent product should fill product name field', (
+    tester,
+  ) async {
+    final recentProducts = [
+      KnownProduct.fromStorage(
+        id: 'product-1',
+        name: 'Молоко',
+        createdAt: DateTime(2026, 1, 1),
+        updatedAt: DateTime(2026, 1, 2),
+        lastPurchasedAt: DateTime(2026, 1, 2),
+      ),
+    ];
+
+    await tester.pumpWidget(createTestApp(recentProducts: recentProducts));
+    await tester.pump();
+
+    await tester.tap(find.text('Молоко'));
+    await tester.pump();
+
+    final nameField = tester.widget<TextField>(find.byType(TextField).first);
+
+    expect(nameField.controller?.text, 'Молоко');
   });
 }
