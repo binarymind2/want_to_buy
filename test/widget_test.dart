@@ -248,7 +248,7 @@ void main() {
     expect(find.text('База товаров'), findsOneWidget);
     expect(find.text('Показать товары в БД'), findsOneWidget);
     expect(find.text('О приложении'), findsOneWidget);
-    expect(find.text('Want to Buy'), findsOneWidget);
+    expect(find.text('Хочу купить'), findsOneWidget);
   });
 
   testWidgets('Settings screen should show known products database dialog', (

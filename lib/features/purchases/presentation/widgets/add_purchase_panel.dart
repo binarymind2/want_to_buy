@@ -179,7 +179,14 @@ class AddPurchasePanel extends StatelessWidget {
                   width: 48,
                   child: FilledButton(
                     onPressed: onAddPressed,
-                    child: const Icon(Icons.add),
+                    style: FilledButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(48, 48),
+                      alignment: Alignment.center,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      shape: const CircleBorder(),
+                    ),
+                    child: const Center(child: Icon(Icons.add, size: 24)),
                   ),
                 ),
               ],

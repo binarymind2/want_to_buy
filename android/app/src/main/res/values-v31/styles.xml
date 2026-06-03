@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        Android 12+ also has its own system splash screen API, but this project
+        does not use the androidx.core splashscreen dependency yet.
+
+        Поэтому здесь оставляем обычную Flutter/Android launch-тему без
+        android:postSplashScreenTheme. На некоторых конфигурациях Flutter/Gradle
+        этот атрибут не находится на этапе processDebugResources.
+    -->
+    <style name="LaunchTheme" parent="@android:style/Theme.NoTitleBar">
+        <item name="android:windowBackground">@drawable/launch_background</item>
+    </style>
+
+    <style name="NormalTheme" parent="@android:style/Theme.NoTitleBar">
+        <item name="android:windowBackground">?android:colorBackground</item>
+    </style>
+</resources>

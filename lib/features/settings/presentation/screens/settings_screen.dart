@@ -80,7 +80,7 @@ class SettingsScreen extends ConsumerWidget {
             children: [
               ListTile(
                 leading: Icon(Icons.info_outline),
-                title: Text('Want to Buy'),
+                title: Text('Хочу купить'),
                 subtitle: Text('Версия 1.0.0'),
               ),
             ],
