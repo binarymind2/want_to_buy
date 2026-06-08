@@ -1,4 +1,5 @@
 import '../../../products/domain/repositories/known_product_repository.dart';
+import '../../../products/domain/entities/known_product.dart';
 import '../../domain/entities/shopping_item.dart';
 import '../../domain/repositories/shopping_item_repository.dart';
 
@@ -64,10 +65,14 @@ class PurchasesController {
   /// 1. Пользователь нажал на строку.
   /// 2. Прошёл 5-секундный отсчёт.
   /// 3. Товар считается купленным.
-  /// 4. У KnownProduct обновляется lastPurchasedAt.
+  /// 4. У KnownProduct обновляется lastPurchasedAt и lastPurchasedQuantity.
   /// 5. ShoppingItem удаляется из активного списка.
   Future<void> completePurchase(ShoppingItem item) async {
-    await _knownProductRepository.markPurchased(item.knownProductId);
+    await _knownProductRepository.markPurchased(
+      item.knownProductId,
+      quantity: item.quantity,
+    );
+
     await _shoppingItemRepository.deleteById(item.id);
   }
 
@@ -77,5 +82,24 @@ class PurchasesController {
   /// но он может пригодиться позже для обычного удаления.
   Future<void> deletePurchase(String itemId) async {
     await _shoppingItemRepository.deleteById(itemId);
+  }
+
+  /// Возвращает товар из последних покупок в активный список.
+  ///
+  /// Важно:
+  /// здесь мы не создаём новый KnownProduct.
+  /// Товар уже есть в базе известных товаров, потому что он пришёл
+  /// из секции "Последние покупки".
+  ///
+  /// Логика:
+  /// 1. Пользователь нажал на последнюю покупку.
+  /// 2. Берём её KnownProduct.
+  /// 3. Добавляем товар в активные покупки.
+  /// 4. В качестве количества используем lastPurchasedQuantity.
+  Future<void> addRecentPurchase(KnownProduct product) async {
+    await _shoppingItemRepository.addOrUpdate(
+      product: product,
+      quantity: product.lastPurchasedQuantity,
+    );
   }
 }

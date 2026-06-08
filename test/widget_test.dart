@@ -214,7 +214,7 @@ void main() {
     },
   );
 
-  testWidgets('Tap on recent product should fill product name field', (
+  testWidgets('Recent product should show last purchased quantity', (
     tester,
   ) async {
     final recentProducts = [
@@ -224,18 +224,15 @@ void main() {
         createdAt: DateTime(2026, 1, 1),
         updatedAt: DateTime(2026, 1, 2),
         lastPurchasedAt: DateTime(2026, 1, 2),
+        lastPurchasedQuantity: '2',
       ),
     ];
 
     await tester.pumpWidget(createTestApp(recentProducts: recentProducts));
     await tester.pump();
 
-    await tester.tap(find.text('Молоко'));
-    await tester.pump();
-
-    final nameField = tester.widget<TextField>(find.byType(TextField).first);
-
-    expect(nameField.controller?.text, 'Молоко');
+    expect(find.text('Молоко'), findsOneWidget);
+    expect(find.text('2'), findsOneWidget);
   });
 
   testWidgets('Settings screen should show settings actions', (tester) async {

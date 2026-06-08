@@ -114,7 +114,10 @@ class IsarKnownProductRepository implements KnownProductRepository {
   }
 
   @override
-  Future<KnownProduct?> markPurchased(String productId) async {
+  Future<KnownProduct?> markPurchased(
+    String productId, {
+    String? quantity,
+  }) async {
     return _isar.writeTxn(() async {
       final existingModel = await _isar.knownProductModels.getByDomainId(
         productId,
@@ -124,7 +127,10 @@ class IsarKnownProductRepository implements KnownProductRepository {
         return null;
       }
 
-      final updatedProduct = existingModel.toEntity().markPurchased();
+      final updatedProduct = existingModel.toEntity().markPurchased(
+        quantity: quantity,
+      );
+
       final updatedModel = updatedProduct.toModel(isarId: existingModel.id);
 
       await _isar.knownProductModels.put(updatedModel);

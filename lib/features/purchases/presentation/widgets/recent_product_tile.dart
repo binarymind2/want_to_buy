@@ -8,14 +8,16 @@ import '../../../products/domain/entities/known_product.dart';
 /// Поэтому здесь нет:
 /// - таймера удаления;
 /// - прогресс-бара;
-/// - количества;
 /// - иконок.
 ///
 /// Нажатие на строку означает:
-/// "Я хочу снова добавить этот товар в список покупок".
+/// "Вернуть этот товар в активный список покупок".
 ///
-/// Мы оставляем только текст,
-/// чтобы последние покупки выглядели как обычный спокойный список.
+/// Показываем не только название, но и последнее количество.
+/// Так пользователь заранее видит, что именно вернётся в список:
+/// - Молоко 2
+/// - Хлеб
+/// - Яйца 10
 class RecentProductTile extends StatelessWidget {
   const RecentProductTile({
     super.key,
@@ -29,18 +31,39 @@ class RecentProductTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final quantity = product.lastPurchasedQuantity;
 
     return InkWell(
       onTap: onPressed,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Text(
-          product.name,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: Theme.of(
-            context,
-          ).textTheme.bodyLarge?.copyWith(color: colorScheme.onSurfaceVariant),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                product.name,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.bodyLarge?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            SizedBox(
+              width: 64,
+              child: Text(
+                quantity ?? '',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.end,
+                style: textTheme.bodyLarge?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

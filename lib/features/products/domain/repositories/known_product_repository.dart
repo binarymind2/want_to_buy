@@ -63,6 +63,6 @@ abstract class KnownProductRepository {
   /// Отмечает товар как купленный.
   ///
   /// Сам товар из БД не удаляется.
-  /// Мы только обновляем lastPurchasedAt.
-  Future<KnownProduct?> markPurchased(String productId);
+  /// Мы обновляем lastPurchasedAt и запоминаем последнее количество.
+  Future<KnownProduct?> markPurchased(String productId, {String? quantity});
 }

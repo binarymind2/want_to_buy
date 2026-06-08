@@ -32,14 +32,19 @@ const KnownProductModelSchema = CollectionSchema(
       name: r'lastPurchasedAt',
       type: IsarType.dateTime,
     ),
-    r'name': PropertySchema(id: 3, name: r'name', type: IsarType.string),
+    r'lastPurchasedQuantity': PropertySchema(
+      id: 3,
+      name: r'lastPurchasedQuantity',
+      type: IsarType.string,
+    ),
+    r'name': PropertySchema(id: 4, name: r'name', type: IsarType.string),
     r'normalizedName': PropertySchema(
-      id: 4,
+      id: 5,
       name: r'normalizedName',
       type: IsarType.string,
     ),
     r'updatedAt': PropertySchema(
-      id: 5,
+      id: 6,
       name: r'updatedAt',
       type: IsarType.dateTime,
     ),
@@ -92,6 +97,12 @@ int _knownProductModelEstimateSize(
 ) {
   var bytesCount = offsets.last;
   bytesCount += 3 + object.domainId.length * 3;
+  {
+    final value = object.lastPurchasedQuantity;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   bytesCount += 3 + object.name.length * 3;
   bytesCount += 3 + object.normalizedName.length * 3;
   return bytesCount;
@@ -106,9 +117,10 @@ void _knownProductModelSerialize(
   writer.writeDateTime(offsets[0], object.createdAt);
   writer.writeString(offsets[1], object.domainId);
   writer.writeDateTime(offsets[2], object.lastPurchasedAt);
-  writer.writeString(offsets[3], object.name);
-  writer.writeString(offsets[4], object.normalizedName);
-  writer.writeDateTime(offsets[5], object.updatedAt);
+  writer.writeString(offsets[3], object.lastPurchasedQuantity);
+  writer.writeString(offsets[4], object.name);
+  writer.writeString(offsets[5], object.normalizedName);
+  writer.writeDateTime(offsets[6], object.updatedAt);
 }
 
 KnownProductModel _knownProductModelDeserialize(
@@ -122,9 +134,10 @@ KnownProductModel _knownProductModelDeserialize(
   object.domainId = reader.readString(offsets[1]);
   object.id = id;
   object.lastPurchasedAt = reader.readDateTimeOrNull(offsets[2]);
-  object.name = reader.readString(offsets[3]);
-  object.normalizedName = reader.readString(offsets[4]);
-  object.updatedAt = reader.readDateTime(offsets[5]);
+  object.lastPurchasedQuantity = reader.readStringOrNull(offsets[3]);
+  object.name = reader.readString(offsets[4]);
+  object.normalizedName = reader.readString(offsets[5]);
+  object.updatedAt = reader.readDateTime(offsets[6]);
   return object;
 }
 
@@ -142,10 +155,12 @@ P _knownProductModelDeserializeProp<P>(
     case 2:
       return (reader.readDateTimeOrNull(offset)) as P;
     case 3:
-      return (reader.readString(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 4:
       return (reader.readString(offset)) as P;
     case 5:
+      return (reader.readString(offset)) as P;
+    case 6:
       return (reader.readDateTime(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -804,6 +819,168 @@ extension KnownProductModelQueryFilter
   }
 
   QueryBuilder<KnownProductModel, KnownProductModel, QAfterFilterCondition>
+  lastPurchasedQuantityIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'lastPurchasedQuantity'),
+      );
+    });
+  }
+
+  QueryBuilder<KnownProductModel, KnownProductModel, QAfterFilterCondition>
+  lastPurchasedQuantityIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'lastPurchasedQuantity'),
+      );
+    });
+  }
+
+  QueryBuilder<KnownProductModel, KnownProductModel, QAfterFilterCondition>
+  lastPurchasedQuantityEqualTo(String? value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'lastPurchasedQuantity',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<KnownProductModel, KnownProductModel, QAfterFilterCondition>
+  lastPurchasedQuantityGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'lastPurchasedQuantity',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<KnownProductModel, KnownProductModel, QAfterFilterCondition>
+  lastPurchasedQuantityLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'lastPurchasedQuantity',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<KnownProductModel, KnownProductModel, QAfterFilterCondition>
+  lastPurchasedQuantityBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'lastPurchasedQuantity',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<KnownProductModel, KnownProductModel, QAfterFilterCondition>
+  lastPurchasedQuantityStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'lastPurchasedQuantity',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<KnownProductModel, KnownProductModel, QAfterFilterCondition>
+  lastPurchasedQuantityEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'lastPurchasedQuantity',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<KnownProductModel, KnownProductModel, QAfterFilterCondition>
+  lastPurchasedQuantityContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'lastPurchasedQuantity',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<KnownProductModel, KnownProductModel, QAfterFilterCondition>
+  lastPurchasedQuantityMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'lastPurchasedQuantity',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<KnownProductModel, KnownProductModel, QAfterFilterCondition>
+  lastPurchasedQuantityIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'lastPurchasedQuantity', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<KnownProductModel, KnownProductModel, QAfterFilterCondition>
+  lastPurchasedQuantityIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          property: r'lastPurchasedQuantity',
+          value: '',
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<KnownProductModel, KnownProductModel, QAfterFilterCondition>
   nameEqualTo(String value, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
@@ -1192,6 +1369,20 @@ extension KnownProductModelQuerySortBy
   }
 
   QueryBuilder<KnownProductModel, KnownProductModel, QAfterSortBy>
+  sortByLastPurchasedQuantity() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastPurchasedQuantity', Sort.asc);
+    });
+  }
+
+  QueryBuilder<KnownProductModel, KnownProductModel, QAfterSortBy>
+  sortByLastPurchasedQuantityDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastPurchasedQuantity', Sort.desc);
+    });
+  }
+
+  QueryBuilder<KnownProductModel, KnownProductModel, QAfterSortBy>
   sortByName() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'name', Sort.asc);
@@ -1292,6 +1483,20 @@ extension KnownProductModelQuerySortThenBy
   }
 
   QueryBuilder<KnownProductModel, KnownProductModel, QAfterSortBy>
+  thenByLastPurchasedQuantity() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastPurchasedQuantity', Sort.asc);
+    });
+  }
+
+  QueryBuilder<KnownProductModel, KnownProductModel, QAfterSortBy>
+  thenByLastPurchasedQuantityDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastPurchasedQuantity', Sort.desc);
+    });
+  }
+
+  QueryBuilder<KnownProductModel, KnownProductModel, QAfterSortBy>
   thenByName() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'name', Sort.asc);
@@ -1357,6 +1562,16 @@ extension KnownProductModelQueryWhereDistinct
     });
   }
 
+  QueryBuilder<KnownProductModel, KnownProductModel, QDistinct>
+  distinctByLastPurchasedQuantity({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(
+        r'lastPurchasedQuantity',
+        caseSensitive: caseSensitive,
+      );
+    });
+  }
+
   QueryBuilder<KnownProductModel, KnownProductModel, QDistinct> distinctByName({
     bool caseSensitive = true,
   }) {
@@ -1408,6 +1623,13 @@ extension KnownProductModelQueryProperty
   lastPurchasedAtProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'lastPurchasedAt');
+    });
+  }
+
+  QueryBuilder<KnownProductModel, String?, QQueryOperations>
+  lastPurchasedQuantityProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'lastPurchasedQuantity');
     });
   }
 

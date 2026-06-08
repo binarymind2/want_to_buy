@@ -110,19 +110,29 @@ class _PurchasesScreenState extends ConsumerState<PurchasesScreen> {
     _startPendingRemoval(item);
   }
 
-  /// Подставляет товар из последних покупок в поле ввода.
+  /// Добавляет товар из последних покупок в активный список.
   ///
-  /// Мы не добавляем его сразу в активные покупки.
-  ///
-  /// Почему:
-  /// пользователь может захотеть указать количество.
+  /// Раньше мы только подставляли название в поле ввода.
+  /// Теперь пользователь ожидает более быстрый сценарий:
+  /// нажал на последнюю покупку — товар сразу вернулся в список покупок.
   void _onRecentProductPressed(KnownProduct product) {
-    _nameController.value = TextEditingValue(
-      text: product.name,
-      selection: TextSelection.collapsed(offset: product.name.length),
-    );
+    unawaited(_addRecentProductToPurchases(product));
+  }
 
-    _nameFocusNode.requestFocus();
+  Future<void> _addRecentProductToPurchases(KnownProduct product) async {
+    try {
+      await ref.read(purchasesControllerProvider).addRecentPurchase(product);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Не удалось добавить последнюю покупку: $error'),
+        ),
+      );
+    }
   }
 
   void _startPendingRemoval(ShoppingItem item) {

@@ -57,6 +57,11 @@ class KnownProductModel {
   ///
   /// Если null — товар ещё не покупали.
   DateTime? lastPurchasedAt;
+
+  /// Количество из последней завершённой покупки.
+  ///
+  /// Если null — последняя покупка была без количества.
+  String? lastPurchasedQuantity;
 }
 
 /// Маппинг из domain-сущности в Isar-модель.
@@ -73,7 +78,8 @@ extension KnownProductToModel on KnownProduct {
       ..normalizedName = normalizedName
       ..createdAt = createdAt
       ..updatedAt = updatedAt
-      ..lastPurchasedAt = lastPurchasedAt;
+      ..lastPurchasedAt = lastPurchasedAt
+      ..lastPurchasedQuantity = lastPurchasedQuantity;
   }
 }
 
@@ -91,6 +97,7 @@ extension KnownProductModelToEntity on KnownProductModel {
       createdAt: createdAt,
       updatedAt: updatedAt,
       lastPurchasedAt: lastPurchasedAt,
+      lastPurchasedQuantity: lastPurchasedQuantity,
     );
   }
 }

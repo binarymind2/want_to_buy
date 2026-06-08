@@ -19,6 +19,7 @@ void main() {
       expect(product.updatedAt, now);
       expect(product.lastPurchasedAt, isNull);
       expect(product.wasPurchased, false);
+      expect(product.lastPurchasedQuantity, isNull);
     });
 
     test('create should keep user letter case in name', () {
@@ -32,26 +33,34 @@ void main() {
       expect(product.normalizedName, 'молоко');
     });
 
-    test('markPurchased should update lastPurchasedAt and updatedAt', () {
-      final createdAt = DateTime(2026, 1, 1);
-      final purchasedAt = DateTime(2026, 1, 2);
+    test(
+      'markPurchased should update lastPurchasedAt, quantity and updatedAt',
+      () {
+        final createdAt = DateTime(2026, 1, 1);
+        final purchasedAt = DateTime(2026, 1, 2);
 
-      final product = KnownProduct.create(
-        id: 'product-1',
-        name: 'Молоко',
-        now: createdAt,
-      );
+        final product = KnownProduct.create(
+          id: 'product-1',
+          name: 'Молоко',
+          now: createdAt,
+        );
 
-      final updatedProduct = product.markPurchased(purchasedAt: purchasedAt);
+        final updatedProduct = product.markPurchased(
+          purchasedAt: purchasedAt,
+          quantity: ' 2 ',
+        );
 
-      expect(updatedProduct.lastPurchasedAt, purchasedAt);
-      expect(updatedProduct.updatedAt, purchasedAt);
-      expect(updatedProduct.wasPurchased, true);
+        expect(updatedProduct.lastPurchasedAt, purchasedAt);
+        expect(updatedProduct.lastPurchasedQuantity, '2');
+        expect(updatedProduct.updatedAt, purchasedAt);
+        expect(updatedProduct.wasPurchased, true);
 
-      // Проверяем, что исходный объект не изменился.
-      expect(product.lastPurchasedAt, isNull);
-      expect(product.updatedAt, createdAt);
-    });
+        // Проверяем, что исходный объект не изменился.
+        expect(product.lastPurchasedAt, isNull);
+        expect(product.lastPurchasedQuantity, isNull);
+        expect(product.updatedAt, createdAt);
+      },
+    );
 
     test('copyWith should format name and recalculate normalizedName', () {
       final createdAt = DateTime(2026, 1, 1);
@@ -74,5 +83,20 @@ void main() {
       expect(updatedProduct.createdAt, createdAt);
       expect(updatedProduct.updatedAt, updatedAt);
     });
+  });
+
+  test('markPurchased should store null when quantity is empty', () {
+    final product = KnownProduct.create(
+      id: 'product-1',
+      name: 'Молоко',
+      now: DateTime(2026, 1, 1),
+    );
+
+    final updatedProduct = product.markPurchased(
+      purchasedAt: DateTime(2026, 1, 2),
+      quantity: '   ',
+    );
+
+    expect(updatedProduct.lastPurchasedQuantity, isNull);
   });
 }

@@ -107,9 +107,42 @@ void main() {
 
         expect(updatedProduct, isNotNull);
         expect(updatedProduct!.lastPurchasedAt, DateTime(2026, 1, 2));
+        expect(updatedProduct.lastPurchasedQuantity, '2');
       },
     );
   });
+
+  test(
+    'addRecentPurchase should add product with last purchased quantity',
+    () async {
+      final knownProductRepository = FakeKnownProductRepository();
+      final shoppingItemRepository = FakeShoppingItemRepository();
+
+      final controller = PurchasesController(
+        knownProductRepository: knownProductRepository,
+        shoppingItemRepository: shoppingItemRepository,
+      );
+
+      final product = KnownProduct.fromStorage(
+        id: 'product-1',
+        name: 'Молоко',
+        createdAt: DateTime(2026, 1, 1),
+        updatedAt: DateTime(2026, 1, 2),
+        lastPurchasedAt: DateTime(2026, 1, 2),
+        lastPurchasedQuantity: '2',
+      );
+
+      await controller.addRecentPurchase(product);
+
+      expect(shoppingItemRepository.items.length, 1);
+
+      final item = shoppingItemRepository.items.single;
+
+      expect(item.knownProductId, product.id);
+      expect(item.nameSnapshot, 'Молоко');
+      expect(item.quantity, '2');
+    },
+  );
 }
 
 class FakeKnownProductRepository implements KnownProductRepository {
@@ -161,7 +194,10 @@ class FakeKnownProductRepository implements KnownProductRepository {
   }
 
   @override
-  Future<KnownProduct?> markPurchased(String productId) async {
+  Future<KnownProduct?> markPurchased(
+    String productId, {
+    String? quantity,
+  }) async {
     final product = await findById(productId);
 
     if (product == null) {
@@ -170,6 +206,7 @@ class FakeKnownProductRepository implements KnownProductRepository {
 
     final updatedProduct = product.markPurchased(
       purchasedAt: DateTime(2026, 1, 2),
+      quantity: quantity,
     );
 
     _productsByNormalizedName[updatedProduct.normalizedName] = updatedProduct;
