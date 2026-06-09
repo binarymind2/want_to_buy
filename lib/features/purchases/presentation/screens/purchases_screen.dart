@@ -223,47 +223,45 @@ class _PurchasesScreenState extends ConsumerState<PurchasesScreen> {
         ],
       ),
       body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: shoppingItemsAsync.when(
-                data: (items) {
-                  final hasActiveItems = items.isNotEmpty;
-                  final hasRecentProducts = recentProducts.isNotEmpty;
+        bottom: false,
+        child: shoppingItemsAsync.when(
+          data: (items) {
+            final hasActiveItems = items.isNotEmpty;
+            final hasRecentProducts = recentProducts.isNotEmpty;
 
-                  if (!hasActiveItems && !hasRecentProducts) {
-                    return const EmptyPurchasesView();
-                  }
+            if (!hasActiveItems && !hasRecentProducts) {
+              return const EmptyPurchasesView();
+            }
 
-                  return ShoppingItemsList(
-                    items: items,
-                    recentProducts: recentProducts,
-                    pendingRemovalItemIds: _pendingRemovalItemIds,
-                    removalDelay: _removalDelay,
-                    onItemPressed: _onShoppingItemPressed,
-                    onRecentProductPressed: _onRecentProductPressed,
-                  );
-                },
-                loading: () {
-                  return const Center(child: CircularProgressIndicator());
-                },
-                error: (error, stackTrace) {
-                  return ErrorMessageView(
-                    title: 'Не удалось загрузить список покупок',
-                    message: error.toString(),
-                  );
-                },
-              ),
-            ),
-            AddPurchasePanel(
-              nameController: _nameController,
-              quantityController: _quantityController,
-              nameFocusNode: _nameFocusNode,
-              knownProducts: knownProducts,
-              activeKnownProductIds: activeKnownProductIds,
-              onAddPressed: _onAddPressed,
-            ),
-          ],
+            return ShoppingItemsList(
+              items: items,
+              recentProducts: recentProducts,
+              pendingRemovalItemIds: _pendingRemovalItemIds,
+              removalDelay: _removalDelay,
+              onItemPressed: _onShoppingItemPressed,
+              onRecentProductPressed: _onRecentProductPressed,
+            );
+          },
+          loading: () {
+            return const Center(child: CircularProgressIndicator());
+          },
+          error: (error, stackTrace) {
+            return ErrorMessageView(
+              title: 'Не удалось загрузить список покупок',
+              message: error.toString(),
+            );
+          },
+        ),
+      ),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: AddPurchasePanel(
+          nameController: _nameController,
+          quantityController: _quantityController,
+          nameFocusNode: _nameFocusNode,
+          knownProducts: knownProducts,
+          activeKnownProductIds: activeKnownProductIds,
+          onAddPressed: _onAddPressed,
         ),
       ),
     );

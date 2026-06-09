@@ -152,6 +152,7 @@ class AddPurchasePanel extends StatelessWidget {
                     textInputAction: TextInputAction.next,
                     decoration: const InputDecoration(
                       labelText: 'Товар',
+                      floatingLabelBehavior: FloatingLabelBehavior.always,
                       hintText: 'Например: молоко',
                       border: OutlineInputBorder(),
                       isDense: true,
@@ -167,6 +168,8 @@ class AddPurchasePanel extends StatelessWidget {
                     textInputAction: TextInputAction.done,
                     decoration: const InputDecoration(
                       labelText: 'Кол-во',
+                      floatingLabelBehavior: FloatingLabelBehavior.always,
+                      hintText: '1',
                       border: OutlineInputBorder(),
                       isDense: true,
                     ),
