@@ -29,14 +29,18 @@ void main() {
     );
   }
 
-  testWidgets('WantToBuyApp should show main navigation', (tester) async {
+  testWidgets('WantToBuyApp should start from purchases screen', (
+    tester,
+  ) async {
     await tester.pumpWidget(createTestApp());
 
     // Даём Riverpod обработать StreamProvider.
     await tester.pump();
 
-    expect(find.text('Покупки'), findsWidgets);
-    expect(find.text('Настройки'), findsWidgets);
+    expect(find.text('Покупки'), findsOneWidget);
+    expect(find.byIcon(Icons.settings_outlined), findsOneWidget);
+    expect(find.byType(NavigationBar), findsNothing);
+    expect(find.text('Настройки'), findsNothing);
   });
 
   testWidgets('Purchases screen should show empty state and add panel', (
@@ -246,8 +250,14 @@ void main() {
     expect(find.text('Показать товары в БД'), findsOneWidget);
     expect(find.text('О приложении'), findsOneWidget);
     expect(find.text('Хочу купить'), findsOneWidget);
-  });
+    expect(find.byIcon(Icons.arrow_back), findsOneWidget);
 
+    await tester.tap(find.byIcon(Icons.arrow_back));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Покупки'), findsOneWidget);
+    expect(find.text('База товаров'), findsNothing);
+  });
   testWidgets('Settings screen should show known products database dialog', (
     tester,
   ) async {

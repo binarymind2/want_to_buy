@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../products/domain/entities/known_product.dart';
 import '../../../products/presentation/providers/known_product_providers.dart';
 import '../../../products/presentation/providers/recent_known_product_providers.dart';
+import '../../../settings/presentation/screens/settings_screen.dart';
 import '../../domain/entities/shopping_item.dart';
 import '../providers/shopping_item_providers.dart';
 import '../widgets/add_purchase_panel.dart';
@@ -99,6 +100,12 @@ class _PurchasesScreenState extends ConsumerState<PurchasesScreen> {
         SnackBar(content: Text('Не удалось добавить товар: $error')),
       );
     }
+  }
+
+  void _openSettings() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (context) => const SettingsScreen()),
+    );
   }
 
   void _onShoppingItemPressed(ShoppingItem item) {
@@ -205,7 +212,16 @@ class _PurchasesScreenState extends ConsumerState<PurchasesScreen> {
     );
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Покупки')),
+      appBar: AppBar(
+        title: const Text('Покупки'),
+        actions: [
+          IconButton(
+            tooltip: 'Настройки',
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: _openSettings,
+          ),
+        ],
+      ),
       body: SafeArea(
         child: Column(
           children: [

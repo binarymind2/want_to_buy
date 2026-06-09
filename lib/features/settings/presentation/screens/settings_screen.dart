@@ -57,7 +57,14 @@ class SettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Настройки')),
+      appBar: AppBar(
+        leading: IconButton(
+          tooltip: 'Назад к покупкам',
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: const Text('Настройки'),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
