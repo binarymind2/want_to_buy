@@ -491,21 +491,6 @@ class _KnownProductListTile extends StatelessWidget {
             ),
             const SizedBox(width: 12),
           ],
-          if (isAlreadyInActiveList)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: colorScheme.primaryContainer,
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Text(
-                'В списке',
-                style: textTheme.labelSmall?.copyWith(
-                  color: colorScheme.onPrimaryContainer,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
         ],
       ),
       onTap: onPressed,

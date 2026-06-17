@@ -164,7 +164,7 @@ class _KnownProductsDialog extends StatelessWidget {
                   return ListTile(
                     dense: true,
                     title: Text(product.name),
-                    subtitle: Text(product.normalizedName),
+                    // subtitle: Text(product.normalizedName),
                   );
                 },
               ),
