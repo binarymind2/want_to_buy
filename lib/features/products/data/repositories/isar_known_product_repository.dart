@@ -112,30 +112,4 @@ class IsarKnownProductRepository implements KnownProductRepository {
       await _isar.knownProductModels.put(model);
     });
   }
-
-  @override
-  Future<KnownProduct?> markPurchased(
-    String productId, {
-    String? quantity,
-  }) async {
-    return _isar.writeTxn(() async {
-      final existingModel = await _isar.knownProductModels.getByDomainId(
-        productId,
-      );
-
-      if (existingModel == null) {
-        return null;
-      }
-
-      final updatedProduct = existingModel.toEntity().markPurchased(
-        quantity: quantity,
-      );
-
-      final updatedModel = updatedProduct.toModel(isarId: existingModel.id);
-
-      await _isar.knownProductModels.put(updatedModel);
-
-      return updatedProduct;
-    });
-  }
 }

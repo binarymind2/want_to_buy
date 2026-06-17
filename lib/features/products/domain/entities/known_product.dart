@@ -2,17 +2,18 @@ import '../utils/product_name_normalizer.dart';
 
 /// Известный товар.
 ///
-/// Это товар, который приложение запомнило для:
-/// - автоподсказок;
-/// - контроля уникальности;
-/// - просмотра товаров в БД;
-/// - истории последних покупок.
+/// Это справочник товаров, которые приложение уже встречало.
 ///
 /// Важно:
-/// KnownProduct — это не активная покупка на экране.
-/// Это запись в базе известных товаров.
+/// KnownProduct больше не хранит факт покупки.
+/// Он отвечает только за то, что товар существует как справочная запись:
+/// - название;
+/// - нормализованное название;
+/// - даты создания и изменения.
+///
+/// Состояние товара в списке покупок хранится в ShoppingItem.
 class KnownProduct {
-  /// Уникальный идентификатор товара.
+  /// Уникальный доменный идентификатор товара.
   final String id;
 
   /// Имя товара для отображения пользователю.
@@ -35,28 +36,11 @@ class KnownProduct {
   /// normalizedName: "молоко 2%"
   final String normalizedName;
 
-  /// Дата создания товара.
+  /// Дата создания товара в справочнике.
   final DateTime createdAt;
 
-  /// Дата последнего изменения товара.
+  /// Дата последнего изменения справочной записи.
   final DateTime updatedAt;
-
-  /// Дата последней покупки товара.
-  ///
-  /// Если null — этот товар ещё не покупали через приложение.
-  final DateTime? lastPurchasedAt;
-
-  /// Количество из последней завершённой покупки.
-  ///
-  /// Это значение нужно, чтобы при нажатии на товар из секции
-  /// "Последние покупки" мы могли восстановить не только название,
-  /// но и последнее использованное количество.
-  ///
-  /// Примеры:
-  /// - Молоко 2
-  /// - Яйца 10
-  /// - Хлеб null
-  final String? lastPurchasedQuantity;
 
   /// Приватный конструктор.
   ///
@@ -64,15 +48,14 @@ class KnownProduct {
   /// мы не хотим, чтобы объект создавали напрямую и случайно передавали
   /// неправильную пару name / normalizedName.
   ///
-  /// Создавать KnownProduct нужно через factory KnownProduct.create.
+  /// Создавать KnownProduct нужно через factory KnownProduct.create
+  /// или восстанавливать через KnownProduct.fromStorage.
   const KnownProduct._({
     required this.id,
     required this.name,
     required this.normalizedName,
     required this.createdAt,
     required this.updatedAt,
-    this.lastPurchasedAt,
-    this.lastPurchasedQuantity,
   });
 
   /// Создаёт новый известный товар из пользовательского ввода.
@@ -111,8 +94,6 @@ class KnownProduct {
     required String name,
     required DateTime createdAt,
     required DateTime updatedAt,
-    DateTime? lastPurchasedAt,
-    String? lastPurchasedQuantity,
   }) {
     final formattedName = formatProductName(name);
 
@@ -122,31 +103,6 @@ class KnownProduct {
       normalizedName: normalizeProductName(formattedName),
       createdAt: createdAt,
       updatedAt: updatedAt,
-      lastPurchasedAt: lastPurchasedAt,
-      lastPurchasedQuantity: _prepareLastPurchasedQuantity(
-        lastPurchasedQuantity,
-      ),
-    );
-  }
-
-  /// Был ли товар когда-либо куплен.
-  bool get wasPurchased => lastPurchasedAt != null;
-
-  /// Отмечает товар как купленный.
-  ///
-  /// Это не удаляет товар из базы известных товаров.
-  /// Мы просто запоминаем дату последней покупки и количество.
-  KnownProduct markPurchased({DateTime? purchasedAt, String? quantity}) {
-    final dateTime = purchasedAt ?? DateTime.now();
-
-    return KnownProduct._(
-      id: id,
-      name: name,
-      normalizedName: normalizedName,
-      createdAt: createdAt,
-      updatedAt: dateTime,
-      lastPurchasedAt: dateTime,
-      lastPurchasedQuantity: _prepareLastPurchasedQuantity(quantity),
     );
   }
 
@@ -159,8 +115,6 @@ class KnownProduct {
     String? name,
     DateTime? createdAt,
     DateTime? updatedAt,
-    DateTime? lastPurchasedAt,
-    String? lastPurchasedQuantity,
   }) {
     final formattedName = name == null ? this.name : formatProductName(name);
 
@@ -170,10 +124,6 @@ class KnownProduct {
       normalizedName: normalizeProductName(formattedName),
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
-      lastPurchasedAt: lastPurchasedAt ?? this.lastPurchasedAt,
-      lastPurchasedQuantity: lastPurchasedQuantity == null
-          ? this.lastPurchasedQuantity
-          : _prepareLastPurchasedQuantity(lastPurchasedQuantity),
     );
   }
 
@@ -184,24 +134,7 @@ class KnownProduct {
         'name: $name, '
         'normalizedName: $normalizedName, '
         'createdAt: $createdAt, '
-        'updatedAt: $updatedAt, '
-        'lastPurchasedAt: $lastPurchasedAt, '
-        'lastPurchasedQuantity: $lastPurchasedQuantity'
+        'updatedAt: $updatedAt'
         ')';
   }
-}
-
-/// Подготавливает количество последней покупки перед сохранением.
-///
-/// Если количество пустое, храним null.
-/// Это важно, чтобы старая покупка "Молоко 2" не превращала следующую
-/// покупку "Молоко" снова в "Молоко 2".
-String? _prepareLastPurchasedQuantity(String? value) {
-  final trimmed = value?.trim();
-
-  if (trimmed == null || trimmed.isEmpty) {
-    return null;
-  }
-
-  return trimmed;
 }

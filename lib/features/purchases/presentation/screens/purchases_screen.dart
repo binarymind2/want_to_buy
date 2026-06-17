@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../products/domain/entities/known_product.dart';
 import '../../../products/presentation/providers/recent_known_product_providers.dart';
 import '../../../settings/presentation/screens/settings_screen.dart';
 import '../../domain/entities/shopping_item.dart';
@@ -90,13 +89,13 @@ class _PurchasesScreenState extends ConsumerState<PurchasesScreen> {
   ///
   /// Нажатие на последнюю покупку по-прежнему работает быстро:
   /// товар сразу возвращается в активный список.
-  void _onRecentProductPressed(KnownProduct product) {
-    unawaited(_addRecentProductToPurchases(product));
+  void _onRecentItemPressed(ShoppingItem item) {
+    unawaited(_addRecentItemToPurchases(item));
   }
 
-  Future<void> _addRecentProductToPurchases(KnownProduct product) async {
+  Future<void> _addRecentItemToPurchases(ShoppingItem item) async {
     try {
-      await ref.read(purchasesControllerProvider).addRecentPurchase(product);
+      await ref.read(purchasesControllerProvider).addRecentPurchase(item);
     } catch (error) {
       if (!mounted) {
         return;
@@ -164,7 +163,7 @@ class _PurchasesScreenState extends ConsumerState<PurchasesScreen> {
   @override
   Widget build(BuildContext context) {
     final shoppingItemsAsync = ref.watch(shoppingItemsProvider);
-    final recentProducts = ref.watch(recentKnownProductsProvider);
+    final recentItems = ref.watch(recentShoppingItemsProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -182,19 +181,19 @@ class _PurchasesScreenState extends ConsumerState<PurchasesScreen> {
         child: shoppingItemsAsync.when(
           data: (items) {
             final hasActiveItems = items.isNotEmpty;
-            final hasRecentProducts = recentProducts.isNotEmpty;
+            final hasRecentItems = recentItems.isNotEmpty;
 
-            if (!hasActiveItems && !hasRecentProducts) {
+            if (!hasActiveItems && !hasRecentItems) {
               return const EmptyPurchasesView();
             }
 
             return ShoppingItemsList(
               items: items,
-              recentProducts: recentProducts,
+              recentItems: recentItems,
               pendingRemovalItemIds: _pendingRemovalItemIds,
               removalDelay: _removalDelay,
               onItemPressed: _onShoppingItemPressed,
-              onRecentProductPressed: _onRecentProductPressed,
+              onRecentItemPressed: _onRecentItemPressed,
             );
           },
           loading: () {

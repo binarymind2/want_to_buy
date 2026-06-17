@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../../products/domain/entities/known_product.dart';
 import '../../domain/entities/shopping_item.dart';
 import 'recent_product_tile.dart';
 import 'shopping_item_tile.dart';
@@ -18,21 +17,21 @@ class ShoppingItemsList extends StatelessWidget {
   const ShoppingItemsList({
     super.key,
     required this.items,
-    required this.recentProducts,
+    required this.recentItems,
     required this.pendingRemovalItemIds,
     required this.removalDelay,
     required this.onItemPressed,
-    required this.onRecentProductPressed,
+    required this.onRecentItemPressed,
   });
 
   final List<ShoppingItem> items;
-  final List<KnownProduct> recentProducts;
+  final List<ShoppingItem> recentItems;
 
   final Set<String> pendingRemovalItemIds;
   final Duration removalDelay;
 
   final ValueChanged<ShoppingItem> onItemPressed;
-  final ValueChanged<KnownProduct> onRecentProductPressed;
+  final ValueChanged<ShoppingItem> onRecentItemPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -49,15 +48,15 @@ class ShoppingItemsList extends StatelessWidget {
             onPressed: () => onItemPressed(items[index]),
           ),
         ],
-        if (recentProducts.isNotEmpty) ...[
+        if (recentItems.isNotEmpty) ...[
           if (items.isNotEmpty) const Divider(height: 1),
           const _ListSectionHeader(title: 'Последние покупки'),
-          for (var index = 0; index < recentProducts.length; index++) ...[
+          for (var index = 0; index < recentItems.length; index++) ...[
             if (index > 0) const Divider(height: 1),
             RecentProductTile(
-              key: ValueKey('recent-product-${recentProducts[index].id}'),
-              product: recentProducts[index],
-              onPressed: () => onRecentProductPressed(recentProducts[index]),
+              key: ValueKey('recent-item-${recentItems[index].id}'),
+              item: recentItems[index],
+              onPressed: () => onRecentItemPressed(recentItems[index]),
             ),
           ],
         ],

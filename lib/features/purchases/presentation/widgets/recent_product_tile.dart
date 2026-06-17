@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../products/domain/entities/known_product.dart';
+import '../../domain/entities/shopping_item.dart';
 
 /// Строка товара из секции "Последние покупки".
 ///
@@ -21,18 +21,18 @@ import '../../../products/domain/entities/known_product.dart';
 class RecentProductTile extends StatelessWidget {
   const RecentProductTile({
     super.key,
-    required this.product,
+    required this.item,
     required this.onPressed,
   });
 
-  final KnownProduct product;
+  final ShoppingItem item;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final quantity = product.lastPurchasedQuantity;
+    final quantity = item.quantity;
 
     return InkWell(
       onTap: onPressed,
@@ -42,7 +42,7 @@ class RecentProductTile extends StatelessWidget {
           children: [
             Expanded(
               child: Text(
-                product.name,
+                item.nameSnapshot,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: textTheme.bodyLarge?.copyWith(

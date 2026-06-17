@@ -12,18 +12,33 @@ void main() {
   Widget createTestApp({
     List<ShoppingItem> shoppingItems = const <ShoppingItem>[],
     List<KnownProduct> knownProducts = const <KnownProduct>[],
-    List<KnownProduct>? recentProducts,
+    List<ShoppingItem>? recentItems,
   }) {
+    final purchasedItems = recentItems ?? const <ShoppingItem>[];
+
     return ProviderScope(
       overrides: [
         shoppingItemsProvider.overrideWith((ref) {
           return Stream<List<ShoppingItem>>.value(shoppingItems);
         }),
+
+        allShoppingItemsProvider.overrideWith((ref) {
+          return Stream<List<ShoppingItem>>.value([
+            ...shoppingItems,
+            ...purchasedItems,
+          ]);
+        }),
+
+        purchasedShoppingItemsProvider.overrideWith((ref) {
+          return Stream<List<ShoppingItem>>.value(purchasedItems);
+        }),
+
         knownProductsProvider.overrideWith((ref) {
           return Stream<List<KnownProduct>>.value(knownProducts);
         }),
-        if (recentProducts != null)
-          recentKnownProductsProvider.overrideWithValue(recentProducts),
+
+        if (recentItems != null)
+          recentShoppingItemsProvider.overrideWithValue(recentItems),
       ],
       child: const WantToBuyApp(),
     );
@@ -137,6 +152,49 @@ void main() {
     expect(find.text('Обновить товар'), findsOneWidget);
   });
 
+  testWidgets(
+    'Add bottom sheet should use quantity from purchased shopping item',
+    (tester) async {
+      final knownProducts = [
+        KnownProduct.create(
+          id: 'product-1',
+          name: 'Молоко',
+          now: DateTime(2026, 1, 1),
+        ),
+      ];
+
+      final recentItems = [
+        ShoppingItem.create(
+          id: 'item-1',
+          knownProductId: 'product-1',
+          nameSnapshot: 'Молоко',
+          quantity: '2',
+          sortOrder: 1,
+          now: DateTime(2026, 1, 1),
+        ).markPurchased(purchasedAt: DateTime(2026, 1, 2)),
+      ];
+
+      await tester.pumpWidget(
+        createTestApp(knownProducts: knownProducts, recentItems: recentItems),
+      );
+
+      await tester.pump();
+
+      await tester.tap(find.byTooltip('Добавить товар'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Молоко').last);
+      await tester.pump();
+
+      expect(find.text('Добавить товар'), findsWidgets);
+
+      final textFields = tester.widgetList<TextField>(find.byType(TextField));
+      final quantityField = textFields.elementAt(1);
+
+      expect(quantityField.controller?.text, '2');
+    },
+  );
+
   testWidgets('Tap on shopping item should show removal progress', (
     tester,
   ) async {
@@ -195,7 +253,7 @@ void main() {
   });
 
   testWidgets(
-    'Purchases screen should show recent products after active purchases',
+    'Purchases screen should show recent items after active purchases',
     (tester) async {
       final shoppingItems = [
         ShoppingItem.create(
@@ -208,22 +266,21 @@ void main() {
         ),
       ];
 
-      final recentProducts = [
-        KnownProduct.fromStorage(
-          id: 'product-2',
-          name: 'Молоко',
-          createdAt: DateTime(2026, 1, 1),
-          updatedAt: DateTime(2026, 1, 2),
-          lastPurchasedAt: DateTime(2026, 1, 2),
-        ),
+      final recentItems = [
+        ShoppingItem.create(
+          id: 'item-2',
+          knownProductId: 'product-2',
+          nameSnapshot: 'Молоко',
+          quantity: '2',
+          sortOrder: 2,
+          now: DateTime(2026, 1, 1),
+        ).markPurchased(purchasedAt: DateTime(2026, 1, 2)),
       ];
 
       await tester.pumpWidget(
-        createTestApp(
-          shoppingItems: shoppingItems,
-          recentProducts: recentProducts,
-        ),
+        createTestApp(shoppingItems: shoppingItems, recentItems: recentItems),
       );
+
       await tester.pump();
 
       expect(find.text('Хлеб'), findsOneWidget);
@@ -241,21 +298,19 @@ void main() {
     },
   );
 
-  testWidgets('Recent product should show last purchased quantity', (
-    tester,
-  ) async {
-    final recentProducts = [
-      KnownProduct.fromStorage(
-        id: 'product-1',
-        name: 'Молоко',
-        createdAt: DateTime(2026, 1, 1),
-        updatedAt: DateTime(2026, 1, 2),
-        lastPurchasedAt: DateTime(2026, 1, 2),
-        lastPurchasedQuantity: '2',
-      ),
+  testWidgets('Recent item should show purchased quantity', (tester) async {
+    final recentItems = [
+      ShoppingItem.create(
+        id: 'item-1',
+        knownProductId: 'product-1',
+        nameSnapshot: 'Молоко',
+        quantity: '2',
+        sortOrder: 1,
+        now: DateTime(2026, 1, 1),
+      ).markPurchased(purchasedAt: DateTime(2026, 1, 2)),
     ];
 
-    await tester.pumpWidget(createTestApp(recentProducts: recentProducts));
+    await tester.pumpWidget(createTestApp(recentItems: recentItems));
     await tester.pump();
 
     expect(find.text('Молоко'), findsOneWidget);
@@ -281,6 +336,7 @@ void main() {
     expect(find.text('Покупки'), findsOneWidget);
     expect(find.text('База товаров'), findsNothing);
   });
+
   testWidgets('Settings screen should show known products database dialog', (
     tester,
   ) async {
@@ -290,7 +346,6 @@ void main() {
         name: 'Молоко',
         createdAt: DateTime(2026, 1, 1),
         updatedAt: DateTime(2026, 1, 2),
-        lastPurchasedAt: DateTime(2026, 1, 2),
       ),
       KnownProduct.fromStorage(
         id: 'product-2',
@@ -312,39 +367,48 @@ void main() {
     expect(find.text('Товары в БД'), findsOneWidget);
     expect(find.text('Молоко'), findsOneWidget);
     expect(find.text('Хлеб'), findsOneWidget);
-    expect(find.text('Товар уже покупали'), findsOneWidget);
-    expect(find.text('Пока не покупали'), findsOneWidget);
+
+    // KnownProduct теперь является только справочником.
+    // Поэтому экран настроек больше не показывает:
+    // "Товар уже покупали" / "Пока не покупали".
+    //
+    // Вместо этого в subtitle показываем normalizedName.
+    expect(find.text('молоко'), findsOneWidget);
+    expect(find.text('хлеб'), findsOneWidget);
+
+    expect(find.text('Товар уже покупали'), findsNothing);
+    expect(find.text('Пока не покупали'), findsNothing);
   });
 
-  testWidgets(
-    'Purchases screen should show all recent products without icons',
-    (tester) async {
-      final recentProducts = List.generate(6, (index) {
-        final day = index + 1;
+  testWidgets('Purchases screen should show all recent items without icons', (
+    tester,
+  ) async {
+    final recentItems = List.generate(6, (index) {
+      final day = index + 1;
 
-        return KnownProduct.fromStorage(
-          id: 'product-$day',
-          name: 'Товар $day',
-          createdAt: DateTime(2026, 1, 1),
-          updatedAt: DateTime(2026, 1, day),
-          lastPurchasedAt: DateTime(2026, 1, day),
-        );
-      });
+      return ShoppingItem.create(
+        id: 'item-$day',
+        knownProductId: 'product-$day',
+        nameSnapshot: 'Товар $day',
+        quantity: null,
+        sortOrder: day,
+        now: DateTime(2026, 1, 1),
+      ).markPurchased(purchasedAt: DateTime(2026, 1, day));
+    });
 
-      await tester.pumpWidget(createTestApp(recentProducts: recentProducts));
-      await tester.pump();
+    await tester.pumpWidget(createTestApp(recentItems: recentItems));
+    await tester.pump();
 
-      expect(find.text('Последние покупки'), findsOneWidget);
+    expect(find.text('Последние покупки'), findsOneWidget);
 
-      expect(find.text('Товар 1'), findsOneWidget);
-      expect(find.text('Товар 2'), findsOneWidget);
-      expect(find.text('Товар 3'), findsOneWidget);
-      expect(find.text('Товар 4'), findsOneWidget);
-      expect(find.text('Товар 5'), findsOneWidget);
-      expect(find.text('Товар 6'), findsOneWidget);
+    expect(find.text('Товар 1'), findsOneWidget);
+    expect(find.text('Товар 2'), findsOneWidget);
+    expect(find.text('Товар 3'), findsOneWidget);
+    expect(find.text('Товар 4'), findsOneWidget);
+    expect(find.text('Товар 5'), findsOneWidget);
+    expect(find.text('Товар 6'), findsOneWidget);
 
-      expect(find.byIcon(Icons.history), findsNothing);
-      expect(find.byIcon(Icons.add_circle_outline), findsNothing);
-    },
-  );
+    expect(find.byIcon(Icons.history), findsNothing);
+    expect(find.byIcon(Icons.add_circle_outline), findsNothing);
+  });
 }

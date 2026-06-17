@@ -6,7 +6,7 @@ import '../../domain/entities/shopping_item.dart';
 import '../../domain/repositories/shopping_item_repository.dart';
 import '../models/shopping_item_model.dart';
 
-/// Isar-реализация репозитория активных покупок.
+/// Isar-реализация репозитория товаров в списке покупок.
 ///
 /// Это data-слой.
 ///
@@ -32,10 +32,60 @@ class IsarShoppingItemRepository implements ShoppingItemRepository {
   }
 
   @override
+  Stream<List<ShoppingItem>> watchActive() {
+    return _isar.shoppingItemModels
+        .where()
+        .filter()
+        .statusEqualTo(ShoppingItemStatus.active.storageValue)
+        .sortBySortOrder()
+        .watch(fireImmediately: true)
+        .map((models) {
+          return models.map((model) => model.toEntity()).toList();
+        });
+  }
+
+  @override
+  Stream<List<ShoppingItem>> watchPurchased() {
+    return _isar.shoppingItemModels
+        .where()
+        .filter()
+        .statusEqualTo(ShoppingItemStatus.purchased.storageValue)
+        .sortByPurchasedAtDesc()
+        .watch(fireImmediately: true)
+        .map((models) {
+          return models.map((model) => model.toEntity()).toList();
+        });
+  }
+
+  @override
   Future<List<ShoppingItem>> getAll() async {
     final models = await _isar.shoppingItemModels
         .where()
         .sortBySortOrder()
+        .findAll();
+
+    return models.map((model) => model.toEntity()).toList();
+  }
+
+  @override
+  Future<List<ShoppingItem>> getActive() async {
+    final models = await _isar.shoppingItemModels
+        .where()
+        .filter()
+        .statusEqualTo(ShoppingItemStatus.active.storageValue)
+        .sortBySortOrder()
+        .findAll();
+
+    return models.map((model) => model.toEntity()).toList();
+  }
+
+  @override
+  Future<List<ShoppingItem>> getPurchased() async {
+    final models = await _isar.shoppingItemModels
+        .where()
+        .filter()
+        .statusEqualTo(ShoppingItemStatus.purchased.storageValue)
+        .sortByPurchasedAtDesc()
         .findAll();
 
     return models.map((model) => model.toEntity()).toList();
@@ -68,13 +118,16 @@ class IsarShoppingItemRepository implements ShoppingItemRepository {
       );
 
       if (existingModel != null) {
-        final updatedItem = ShoppingItem.fromStorage(
-          id: existingModel.domainId,
-          knownProductId: existingModel.knownProductId,
+        final existingItem = existingModel.toEntity();
+
+        final sortOrder = existingItem.isActive
+            ? existingItem.sortOrder
+            : await _getNextSortOrder();
+
+        final updatedItem = existingItem.activate(
           nameSnapshot: product.name,
           quantity: quantity,
-          createdAt: existingModel.createdAt,
-          sortOrder: existingModel.sortOrder,
+          sortOrder: sortOrder,
         );
 
         await _isar.shoppingItemModels.put(
@@ -101,32 +154,54 @@ class IsarShoppingItemRepository implements ShoppingItemRepository {
   }
 
   @override
-  Future<void> deleteById(String id) async {
-    await _isar.writeTxn(() async {
+  Future<ShoppingItem?> markPurchased(String id) async {
+    return _isar.writeTxn(() async {
       final existingModel = await _isar.shoppingItemModels.getByDomainId(id);
 
       if (existingModel == null) {
-        return;
+        return null;
       }
 
-      await _isar.shoppingItemModels.delete(existingModel.id);
+      final updatedItem = existingModel.toEntity().markPurchased();
+
+      await _isar.shoppingItemModels.put(
+        updatedItem.toModel(isarId: existingModel.id),
+      );
+
+      return updatedItem;
+    });
+  }
+
+  @override
+  Future<ShoppingItem?> markDeleted(String id) async {
+    return _isar.writeTxn(() async {
+      final existingModel = await _isar.shoppingItemModels.getByDomainId(id);
+
+      if (existingModel == null) {
+        return null;
+      }
+
+      final updatedItem = existingModel.toEntity().markDeleted();
+
+      await _isar.shoppingItemModels.put(
+        updatedItem.toModel(isarId: existingModel.id),
+      );
+
+      return updatedItem;
     });
   }
 
   /// Возвращает следующий sortOrder для новой активной покупки.
   ///
-  /// Сейчас мы просто берём максимальный sortOrder в списке
-  /// и прибавляем 1.
-  ///
-  /// Пример:
-  /// уже есть:
-  /// - Молоко, sortOrder = 1
-  /// - Хлеб, sortOrder = 2
-  ///
-  /// новый товар получит sortOrder = 3.
+  /// Важно:
+  /// считаем только активные товары.
+  /// Если товар был куплен и снова вернулся в список,
+  /// он должен попасть вниз активного списка.
   Future<int> _getNextSortOrder() async {
     final lastItem = await _isar.shoppingItemModels
         .where()
+        .filter()
+        .statusEqualTo(ShoppingItemStatus.active.storageValue)
         .sortBySortOrderDesc()
         .findFirst();
 

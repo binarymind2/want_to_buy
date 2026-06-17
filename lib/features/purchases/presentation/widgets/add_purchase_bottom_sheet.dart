@@ -118,19 +118,17 @@ class _AddPurchaseBottomSheetState
 
   /// Подставляет выбранный товар в поля.
   ///
-  /// Если товар уже есть в активном списке,
-  /// берём количество из активной покупки.
+  /// Если для товара уже есть ShoppingItem,
+  /// берём quantity из него.
   ///
-  /// Если товара нет в активном списке,
-  /// но он уже покупался раньше,
-  /// берём последнее купленное количество.
+  /// Это работает и для активной покупки,
+  /// и для последней купленной записи.
   void _selectProduct(
     KnownProduct product,
-    Map<String, ShoppingItem> activeItemsByProductId,
+    Map<String, ShoppingItem> itemsByProductId,
   ) {
-    final activeItem = activeItemsByProductId[product.id];
-    final quantity =
-        activeItem?.quantity ?? product.lastPurchasedQuantity ?? '';
+    final item = itemsByProductId[product.id];
+    final quantity = item?.quantity ?? '';
 
     _nameController.value = TextEditingValue(
       text: product.name,
@@ -185,13 +183,11 @@ class _AddPurchaseBottomSheetState
   /// Делаем быстрый словарь:
   ///
   /// ключ — knownProductId;
-  /// значение — активная покупка.
+  /// значение — ShoppingItem в любом состоянии.
   ///
   /// Так нам легко понять:
-  /// этот известный товар уже есть в текущем списке покупок или нет.
-  Map<String, ShoppingItem> _createActiveItemsByProductId(
-    List<ShoppingItem> items,
-  ) {
+  /// есть ли у известного товара уже сохранённое состояние.
+  Map<String, ShoppingItem> _createItemsByProductId(List<ShoppingItem> items) {
     return <String, ShoppingItem>{
       for (final item in items) item.knownProductId: item,
     };
@@ -225,10 +221,10 @@ class _AddPurchaseBottomSheetState
     final textTheme = Theme.of(context).textTheme;
 
     final knownProductsAsync = ref.watch(knownProductsProvider);
-    final shoppingItemsAsync = ref.watch(shoppingItemsProvider);
+    final allShoppingItemsAsync = ref.watch(allShoppingItemsProvider);
 
-    final activeItemsByProductId = shoppingItemsAsync.maybeWhen(
-      data: _createActiveItemsByProductId,
+    final itemsByProductId = allShoppingItemsAsync.maybeWhen(
+      data: _createItemsByProductId,
       orElse: () => const <String, ShoppingItem>{},
     );
 
@@ -365,20 +361,16 @@ class _AddPurchaseBottomSheetState
                               },
                               itemBuilder: (context, index) {
                                 final product = filteredProducts[index];
-                                final activeItem =
-                                    activeItemsByProductId[product.id];
+                                final item = itemsByProductId[product.id];
                                 final isAlreadyInActiveList =
-                                    activeItem != null;
+                                    item?.isActive ?? false;
 
                                 return _KnownProductListTile(
                                   product: product,
-                                  activeItem: activeItem,
+                                  item: item,
                                   isAlreadyInActiveList: isAlreadyInActiveList,
                                   onPressed: () {
-                                    _selectProduct(
-                                      product,
-                                      activeItemsByProductId,
-                                    );
+                                    _selectProduct(product, itemsByProductId);
                                   },
                                 );
                               },
@@ -421,11 +413,12 @@ class _AddPurchaseBottomSheetState
                         normalizedName: normalizedName,
                       );
 
+                      final selectedItem = selectedProduct == null
+                          ? null
+                          : itemsByProductId[selectedProduct.id];
+
                       final isAlreadyInActiveList =
-                          selectedProduct != null &&
-                          activeItemsByProductId.containsKey(
-                            selectedProduct.id,
-                          );
+                          selectedItem?.isActive ?? false;
 
                       return SizedBox(
                         width: double.infinity,
@@ -460,13 +453,13 @@ class _AddPurchaseBottomSheetState
 class _KnownProductListTile extends StatelessWidget {
   const _KnownProductListTile({
     required this.product,
-    required this.activeItem,
+    required this.item,
     required this.isAlreadyInActiveList,
     required this.onPressed,
   });
 
   final KnownProduct product;
-  final ShoppingItem? activeItem;
+  final ShoppingItem? item;
   final bool isAlreadyInActiveList;
   final VoidCallback onPressed;
 
@@ -475,7 +468,7 @@ class _KnownProductListTile extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    final quantity = activeItem?.quantity ?? product.lastPurchasedQuantity;
+    final quantity = item?.quantity;
 
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 4),

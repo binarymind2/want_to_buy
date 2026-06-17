@@ -19,34 +19,38 @@ class SettingsScreen extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
   ) async {
-    final knownProductsAsync = ref.read(knownProductsProvider);
-
     await showDialog<void>(
       context: context,
       builder: (context) {
-        return knownProductsAsync.when(
-          data: (products) {
-            return _KnownProductsDialog(products: products);
-          },
-          loading: () {
-            return const AlertDialog(
-              title: Text('Товары в БД'),
-              content: SizedBox(
-                height: 96,
-                child: Center(child: CircularProgressIndicator()),
-              ),
-            );
-          },
-          error: (error, stackTrace) {
-            return AlertDialog(
-              title: const Text('Товары в БД'),
-              content: Text('Не удалось загрузить товары: $error'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Закрыть'),
-                ),
-              ],
+        return Consumer(
+          builder: (context, ref, child) {
+            final knownProductsAsync = ref.watch(knownProductsProvider);
+
+            return knownProductsAsync.when(
+              data: (products) {
+                return _KnownProductsDialog(products: products);
+              },
+              loading: () {
+                return const AlertDialog(
+                  title: Text('Товары в БД'),
+                  content: SizedBox(
+                    height: 96,
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+                );
+              },
+              error: (error, stackTrace) {
+                return AlertDialog(
+                  title: const Text('Товары в БД'),
+                  content: Text('Не удалось загрузить товары: $error'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Закрыть'),
+                    ),
+                  ],
+                );
+              },
             );
           },
         );
@@ -140,14 +144,6 @@ class _KnownProductsDialog extends StatelessWidget {
 
   final List<KnownProduct> products;
 
-  String _getProductPurchaseStatus(KnownProduct product) {
-    if (product.wasPurchased) {
-      return 'Товар уже покупали';
-    }
-
-    return 'Пока не покупали';
-  }
-
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
@@ -168,7 +164,7 @@ class _KnownProductsDialog extends StatelessWidget {
                   return ListTile(
                     dense: true,
                     title: Text(product.name),
-                    subtitle: Text(_getProductPurchaseStatus(product)),
+                    subtitle: Text(product.normalizedName),
                   );
                 },
               ),

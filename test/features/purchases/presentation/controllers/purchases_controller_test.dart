@@ -33,6 +33,7 @@ void main() {
         expect(item.knownProductId, product.id);
         expect(item.nameSnapshot, 'Молоко');
         expect(item.quantity, '2');
+        expect(item.status, ShoppingItemStatus.active);
       },
     );
 
@@ -55,6 +56,7 @@ void main() {
 
       expect(item.nameSnapshot, 'Молоко');
       expect(item.quantity, '2');
+      expect(item.status, ShoppingItemStatus.active);
     });
 
     test('addPurchase should throw when name is empty', () async {
@@ -75,8 +77,65 @@ void main() {
       expect(shoppingItemRepository.items, isEmpty);
     });
 
+    test('completePurchase should mark item as purchased', () async {
+      final knownProductRepository = FakeKnownProductRepository();
+      final shoppingItemRepository = FakeShoppingItemRepository();
+
+      final controller = PurchasesController(
+        knownProductRepository: knownProductRepository,
+        shoppingItemRepository: shoppingItemRepository,
+      );
+
+      final product = await knownProductRepository.getOrCreateByName('Молоко');
+
+      final item = await shoppingItemRepository.addOrUpdate(
+        product: product,
+        quantity: '2',
+      );
+
+      expect(shoppingItemRepository.activeItems.length, 1);
+
+      await controller.completePurchase(item);
+
+      expect(shoppingItemRepository.activeItems, isEmpty);
+      expect(shoppingItemRepository.purchasedItems.length, 1);
+
+      final updatedItem = await shoppingItemRepository.findById(item.id);
+
+      expect(updatedItem, isNotNull);
+      expect(updatedItem!.status, ShoppingItemStatus.purchased);
+      expect(updatedItem.purchasedAt, DateTime(2026, 1, 2));
+      expect(updatedItem.quantity, '2');
+    });
+
+    test('deletePurchase should mark item as deleted', () async {
+      final knownProductRepository = FakeKnownProductRepository();
+      final shoppingItemRepository = FakeShoppingItemRepository();
+
+      final controller = PurchasesController(
+        knownProductRepository: knownProductRepository,
+        shoppingItemRepository: shoppingItemRepository,
+      );
+
+      final product = await knownProductRepository.getOrCreateByName('Молоко');
+
+      final item = await shoppingItemRepository.addOrUpdate(
+        product: product,
+        quantity: '2',
+      );
+
+      await controller.deletePurchase(item.id);
+
+      final updatedItem = await shoppingItemRepository.findById(item.id);
+
+      expect(updatedItem, isNotNull);
+      expect(updatedItem!.status, ShoppingItemStatus.deleted);
+      expect(updatedItem.deletedAt, DateTime(2026, 1, 3));
+      expect(shoppingItemRepository.activeItems, isEmpty);
+    });
+
     test(
-      'completePurchase should mark product as purchased and remove item',
+      'addRecentPurchase should activate purchased item with quantity',
       () async {
         final knownProductRepository = FakeKnownProductRepository();
         final shoppingItemRepository = FakeShoppingItemRepository();
@@ -95,54 +154,25 @@ void main() {
           quantity: '2',
         );
 
+        await shoppingItemRepository.markPurchased(item.id);
+
+        final purchasedItem = await shoppingItemRepository.findById(item.id);
+
+        await controller.addRecentPurchase(purchasedItem!);
+
         expect(shoppingItemRepository.items.length, 1);
+        expect(shoppingItemRepository.activeItems.length, 1);
 
-        await controller.completePurchase(item);
+        final activeItem = shoppingItemRepository.activeItems.single;
 
-        expect(shoppingItemRepository.items, isEmpty);
-
-        final updatedProduct = await knownProductRepository.findById(
-          product.id,
-        );
-
-        expect(updatedProduct, isNotNull);
-        expect(updatedProduct!.lastPurchasedAt, DateTime(2026, 1, 2));
-        expect(updatedProduct.lastPurchasedQuantity, '2');
+        expect(activeItem.knownProductId, product.id);
+        expect(activeItem.nameSnapshot, 'Молоко');
+        expect(activeItem.quantity, '2');
+        expect(activeItem.status, ShoppingItemStatus.active);
+        expect(activeItem.purchasedAt, DateTime(2026, 1, 2));
       },
     );
   });
-
-  test(
-    'addRecentPurchase should add product with last purchased quantity',
-    () async {
-      final knownProductRepository = FakeKnownProductRepository();
-      final shoppingItemRepository = FakeShoppingItemRepository();
-
-      final controller = PurchasesController(
-        knownProductRepository: knownProductRepository,
-        shoppingItemRepository: shoppingItemRepository,
-      );
-
-      final product = KnownProduct.fromStorage(
-        id: 'product-1',
-        name: 'Молоко',
-        createdAt: DateTime(2026, 1, 1),
-        updatedAt: DateTime(2026, 1, 2),
-        lastPurchasedAt: DateTime(2026, 1, 2),
-        lastPurchasedQuantity: '2',
-      );
-
-      await controller.addRecentPurchase(product);
-
-      expect(shoppingItemRepository.items.length, 1);
-
-      final item = shoppingItemRepository.items.single;
-
-      expect(item.knownProductId, product.id);
-      expect(item.nameSnapshot, 'Молоко');
-      expect(item.quantity, '2');
-    },
-  );
 }
 
 class FakeKnownProductRepository implements KnownProductRepository {
@@ -194,27 +224,6 @@ class FakeKnownProductRepository implements KnownProductRepository {
   }
 
   @override
-  Future<KnownProduct?> markPurchased(
-    String productId, {
-    String? quantity,
-  }) async {
-    final product = await findById(productId);
-
-    if (product == null) {
-      return null;
-    }
-
-    final updatedProduct = product.markPurchased(
-      purchasedAt: DateTime(2026, 1, 2),
-      quantity: quantity,
-    );
-
-    _productsByNormalizedName[updatedProduct.normalizedName] = updatedProduct;
-
-    return updatedProduct;
-  }
-
-  @override
   Future<void> save(KnownProduct product) async {
     _productsByNormalizedName[product.normalizedName] = product;
   }
@@ -244,6 +253,14 @@ class FakeShoppingItemRepository implements ShoppingItemRepository {
 
   List<ShoppingItem> get items => _itemsByKnownProductId.values.toList();
 
+  List<ShoppingItem> get activeItems {
+    return items.where((item) => item.isActive).toList();
+  }
+
+  List<ShoppingItem> get purchasedItems {
+    return items.where((item) => item.isPurchased).toList();
+  }
+
   @override
   Future<ShoppingItem> addOrUpdate({
     required KnownProduct product,
@@ -252,13 +269,11 @@ class FakeShoppingItemRepository implements ShoppingItemRepository {
     final existingItem = _itemsByKnownProductId[product.id];
 
     if (existingItem != null) {
-      final updatedItem = ShoppingItem.fromStorage(
-        id: existingItem.id,
-        knownProductId: existingItem.knownProductId,
+      final updatedItem = existingItem.activate(
         nameSnapshot: product.name,
         quantity: quantity,
-        createdAt: existingItem.createdAt,
         sortOrder: existingItem.sortOrder,
+        now: DateTime(2026, 1, 4),
       );
 
       _itemsByKnownProductId[product.id] = updatedItem;
@@ -281,10 +296,33 @@ class FakeShoppingItemRepository implements ShoppingItemRepository {
   }
 
   @override
-  Future<void> deleteById(String id) async {
-    _itemsByKnownProductId.removeWhere((key, item) {
-      return item.id == id;
-    });
+  Future<ShoppingItem?> markPurchased(String id) async {
+    final item = await findById(id);
+
+    if (item == null) {
+      return null;
+    }
+
+    final updatedItem = item.markPurchased(purchasedAt: DateTime(2026, 1, 2));
+
+    _itemsByKnownProductId[updatedItem.knownProductId] = updatedItem;
+
+    return updatedItem;
+  }
+
+  @override
+  Future<ShoppingItem?> markDeleted(String id) async {
+    final item = await findById(id);
+
+    if (item == null) {
+      return null;
+    }
+
+    final updatedItem = item.markDeleted(deletedAt: DateTime(2026, 1, 3));
+
+    _itemsByKnownProductId[updatedItem.knownProductId] = updatedItem;
+
+    return updatedItem;
   }
 
   @override
@@ -309,7 +347,27 @@ class FakeShoppingItemRepository implements ShoppingItemRepository {
   }
 
   @override
+  Future<List<ShoppingItem>> getActive() async {
+    return activeItems;
+  }
+
+  @override
+  Future<List<ShoppingItem>> getPurchased() async {
+    return purchasedItems;
+  }
+
+  @override
   Stream<List<ShoppingItem>> watchAll() {
     return Stream.value(items);
+  }
+
+  @override
+  Stream<List<ShoppingItem>> watchActive() {
+    return Stream.value(activeItems);
+  }
+
+  @override
+  Stream<List<ShoppingItem>> watchPurchased() {
+    return Stream.value(purchasedItems);
   }
 }
