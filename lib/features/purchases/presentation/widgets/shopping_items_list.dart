@@ -37,7 +37,7 @@ class ShoppingItemsList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.fromLTRB(0, 8, 0, 96),
       children: [
         for (var index = 0; index < items.length; index++) ...[
           if (index > 0) const Divider(height: 1),

@@ -4,12 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../products/domain/entities/known_product.dart';
-import '../../../products/presentation/providers/known_product_providers.dart';
 import '../../../products/presentation/providers/recent_known_product_providers.dart';
 import '../../../settings/presentation/screens/settings_screen.dart';
 import '../../domain/entities/shopping_item.dart';
 import '../providers/shopping_item_providers.dart';
-import '../widgets/add_purchase_panel.dart';
+import '../widgets/add_purchase_bottom_sheet.dart';
 import '../widgets/empty_purchases_view.dart';
 import '../widgets/error_message_view.dart';
 import '../widgets/shopping_items_list.dart';
@@ -20,7 +19,7 @@ import '../widgets/shopping_items_list.dart';
 /// Он отвечает за пользовательский сценарий:
 /// - показать активные покупки;
 /// - ниже показать последние покупки;
-/// - добавить новую покупку;
+/// - открыть окно добавления новой покупки;
 /// - запустить удаление покупки через 5 секунд;
 /// - отменить удаление повторным нажатием.
 ///
@@ -36,10 +35,6 @@ class PurchasesScreen extends ConsumerStatefulWidget {
 
 class _PurchasesScreenState extends ConsumerState<PurchasesScreen> {
   static const Duration _removalDelay = Duration(seconds: 5);
-
-  final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _quantityController = TextEditingController();
-  final FocusNode _nameFocusNode = FocusNode();
 
   /// Таймеры отложенного удаления.
   ///
@@ -61,45 +56,19 @@ class _PurchasesScreenState extends ConsumerState<PurchasesScreen> {
 
     _removalTimers.clear();
 
-    _nameController.dispose();
-    _quantityController.dispose();
-    _nameFocusNode.dispose();
-
     super.dispose();
   }
 
-  Future<void> _onAddPressed() async {
-    final name = _nameController.text.trim();
-    final quantity = _quantityController.text.trim();
-
-    if (name.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Введите название товара')));
-      return;
-    }
-
-    try {
-      await ref
-          .read(purchasesControllerProvider)
-          .addPurchase(name: name, quantity: quantity);
-
-      if (!mounted) {
-        return;
-      }
-
-      _nameController.clear();
-      _quantityController.clear();
-      _nameFocusNode.requestFocus();
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Не удалось добавить товар: $error')),
-      );
-    }
+  void _openAddPurchaseSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return const AddPurchaseBottomSheet();
+      },
+    );
   }
 
   void _openSettings() {
@@ -119,9 +88,8 @@ class _PurchasesScreenState extends ConsumerState<PurchasesScreen> {
 
   /// Добавляет товар из последних покупок в активный список.
   ///
-  /// Раньше мы только подставляли название в поле ввода.
-  /// Теперь пользователь ожидает более быстрый сценарий:
-  /// нажал на последнюю покупку — товар сразу вернулся в список покупок.
+  /// Нажатие на последнюю покупку по-прежнему работает быстро:
+  /// товар сразу возвращается в активный список.
   void _onRecentProductPressed(KnownProduct product) {
     unawaited(_addRecentProductToPurchases(product));
   }
@@ -196,20 +164,7 @@ class _PurchasesScreenState extends ConsumerState<PurchasesScreen> {
   @override
   Widget build(BuildContext context) {
     final shoppingItemsAsync = ref.watch(shoppingItemsProvider);
-    final knownProductsAsync = ref.watch(knownProductsProvider);
     final recentProducts = ref.watch(recentKnownProductsProvider);
-
-    final knownProducts = knownProductsAsync.maybeWhen(
-      data: (products) => products,
-      orElse: () => const <KnownProduct>[],
-    );
-
-    final activeKnownProductIds = shoppingItemsAsync.maybeWhen(
-      data: (items) {
-        return items.map((item) => item.knownProductId).toSet();
-      },
-      orElse: () => const <String>{},
-    );
 
     return Scaffold(
       appBar: AppBar(
@@ -253,15 +208,12 @@ class _PurchasesScreenState extends ConsumerState<PurchasesScreen> {
           },
         ),
       ),
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: AddPurchasePanel(
-          nameController: _nameController,
-          quantityController: _quantityController,
-          nameFocusNode: _nameFocusNode,
-          knownProducts: knownProducts,
-          activeKnownProductIds: activeKnownProductIds,
-          onAddPressed: _onAddPressed,
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 24),
+        child: FloatingActionButton(
+          tooltip: 'Добавить товар',
+          onPressed: _openAddPurchaseSheet,
+          child: const Icon(Icons.add),
         ),
       ),
     );

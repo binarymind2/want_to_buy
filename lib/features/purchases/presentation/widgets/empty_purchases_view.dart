@@ -29,7 +29,7 @@ class EmptyPurchasesView extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Добавьте товар внизу экрана',
+              'Нажмите +, чтобы добавить товар',
               style: Theme.of(
                 context,
               ).textTheme.bodyMedium?.copyWith(color: colorScheme.outline),

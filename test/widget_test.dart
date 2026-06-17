@@ -43,27 +43,23 @@ void main() {
     expect(find.text('Настройки'), findsNothing);
   });
 
-  testWidgets('Purchases screen should show empty state and add panel', (
+  testWidgets('Purchases screen should show empty state and add button', (
     tester,
   ) async {
     await tester.pumpWidget(createTestApp());
-
-    // Важно:
-    // shoppingItemsProvider — это StreamProvider.
-    // Даже если мы отдаём Stream.value([]),
-    // данные приходят не в самый первый кадр.
-    //
-    // Первый pumpWidget строит приложение.
-    // Второй pump даёт StreamProvider перейти из loading в data.
     await tester.pump();
 
     expect(find.text('Список покупок пуст'), findsOneWidget);
-    expect(find.text('Добавьте товар внизу экрана'), findsOneWidget);
-    expect(find.text('Товар'), findsOneWidget);
-    expect(find.text('Кол-во'), findsOneWidget);
+    expect(find.text('Нажмите +, чтобы добавить товар'), findsOneWidget);
+
+    expect(find.byType(FloatingActionButton), findsOneWidget);
+    expect(find.byTooltip('Добавить товар'), findsOneWidget);
+
+    expect(find.text('Товар'), findsNothing);
+    expect(find.text('Кол-во'), findsNothing);
   });
 
-  testWidgets('Add panel should show product suggestions while typing', (
+  testWidgets('Add bottom sheet should show product suggestions while typing', (
     tester,
   ) async {
     final knownProducts = [
@@ -82,6 +78,12 @@ void main() {
     await tester.pumpWidget(createTestApp(knownProducts: knownProducts));
     await tester.pump();
 
+    await tester.tap(find.byTooltip('Добавить товар'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Товары для выбора'), findsOneWidget);
+    expect(find.byType(FilledButton), findsOneWidget);
+
     await tester.enterText(find.byType(TextField).first, 'мо');
     await tester.pump();
 
@@ -89,29 +91,50 @@ void main() {
     expect(find.text('Хлеб'), findsNothing);
   });
 
-  testWidgets('Tap on suggestion should fill product name field', (
+  testWidgets('Add bottom sheet should mark already active products', (
     tester,
   ) async {
+    final shoppingItems = [
+      ShoppingItem.create(
+        id: 'item-1',
+        knownProductId: 'product-1',
+        nameSnapshot: 'Молоко',
+        quantity: '2',
+        sortOrder: 1,
+        now: DateTime(2026, 1, 1),
+      ),
+    ];
+
     final knownProducts = [
       KnownProduct.create(
         id: 'product-1',
         name: 'Молоко',
         now: DateTime(2026, 1, 1),
       ),
+      KnownProduct.create(
+        id: 'product-2',
+        name: 'Хлеб',
+        now: DateTime(2026, 1, 1),
+      ),
     ];
 
-    await tester.pumpWidget(createTestApp(knownProducts: knownProducts));
+    await tester.pumpWidget(
+      createTestApp(shoppingItems: shoppingItems, knownProducts: knownProducts),
+    );
+
     await tester.pump();
 
-    await tester.enterText(find.byType(TextField).first, 'мо');
+    await tester.tap(find.byTooltip('Добавить товар'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Молоко'), findsWidgets);
+    expect(find.text('Уже в списке покупок'), findsOneWidget);
+    expect(find.text('В списке'), findsOneWidget);
+
+    await tester.tap(find.text('Молоко').last);
     await tester.pump();
 
-    await tester.tap(find.text('Молоко'));
-    await tester.pump();
-
-    final nameField = tester.widget<TextField>(find.byType(TextField).first);
-
-    expect(nameField.controller?.text, 'Молоко');
+    expect(find.text('Обновить товар'), findsOneWidget);
   });
 
   testWidgets('Tap on shopping item should show removal progress', (
